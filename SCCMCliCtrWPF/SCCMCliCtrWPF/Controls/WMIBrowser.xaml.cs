@@ -72,7 +72,7 @@ namespace ClientCenter.Controls
                 {
                     lClasses.Clear();
 
-                    List<PSObject> oClasses = oAgent.Client.GetObjectsFromPS("Get-WmiObject -Namespace '" + ((ListBoxItem)cb_Namespace.SelectedValue).Content.ToString() + "' -List | where { !$_.Name.StartsWith(\"__\") }", false);
+                    List<PSObject> oClasses = oAgent.Client.GetObjectsFromPS("Get-CimClass -Namespace '" + ((ListBoxItem)cb_Namespace.SelectedValue).Content.ToString() + "' | Where-Object { !$_.CimClassName.StartsWith(\"__\") } | Select-Object @{Name='Name';Expression={$_.CimClassName}}", false);
 
                     foreach (PSObject oClass in oClasses)
                     {

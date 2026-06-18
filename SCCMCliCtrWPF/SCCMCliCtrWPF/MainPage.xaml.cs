@@ -208,6 +208,7 @@ namespace ClientCenter
             bool bNoConnect = true;
             try
             {
+#if NETFRAMEWORK
                 if (System.Deployment.Application.ApplicationDeployment.IsNetworkDeployed)
                 {
                     //Pass Parameter like: http://sccmclictr.codeplex.com/releases/clickonce/SCCMCliCtrWPF.application?Computer2
@@ -247,6 +248,7 @@ namespace ClientCenter
                     }
                 }
                 else
+#endif
                 {
                     if (Environment.GetCommandLineArgs().Count() > 0)
                     {
@@ -381,6 +383,7 @@ namespace ClientCenter
         //Code from http://antscode.blogspot.com/2011/02/running-clickonce-application-as.html
         private void Application_Startup(object sender, string parameter)
         {
+#if NETFRAMEWORK
             if (!IsRunAsAdministrator())
             {
                 if (System.Windows.Interop.BrowserInteropHelper.IsBrowserHosted)
@@ -419,6 +422,7 @@ namespace ClientCenter
 
                 // Do normal startup stuff...
             }
+#endif
         }
 
         void Current_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)

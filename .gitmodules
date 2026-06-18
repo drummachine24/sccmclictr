@@ -1,0 +1,3 @@
+[submodule "sccmclictrlib"]
+	path = sccmclictrlib
+	url = https://github.com/drummachine24/sccmclictrlib.git
