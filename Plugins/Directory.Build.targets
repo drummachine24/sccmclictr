@@ -1,0 +1,19 @@
+<Project>
+  <ItemGroup>
+    <Compile Remove="**\*-NUC1.cs" />
+    <Compile Remove="**\*.xaml-NUC1.cs" />
+    <Compile Remove="**\UserControl1.xaml.cs" />
+    <Compile Remove="Properties\AssemblyInfo.cs" />
+    <Page Remove="**\*-NUC1.xaml" />
+    <Page Remove="**\*.xaml-NUC1.xaml" />
+  </ItemGroup>
+
+  <Target Name="CopyPluginToAppOutput" AfterTargets="Build" Condition="'$(MSBuildProjectName)' != 'RuckZuck.Base'">
+    <PropertyGroup>
+      <_AppOutputDir>$(MSBuildThisFileDirectory)..\SCCMCliCtrWPF\SCCMCliCtrWPF\bin\$(Configuration)\$(TargetFramework)\</_AppOutputDir>
+    </PropertyGroup>
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(_AppOutputDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(_AppOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths)" DestinationFolder="$(_AppOutputDir)" SkipUnchangedFiles="true" Condition="'@(ReferenceCopyLocalPaths)' != ''" />
+  </Target>
+</Project>

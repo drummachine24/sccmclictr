@@ -50,7 +50,9 @@ namespace ClientCenter
             {
                 this.Title = SCCMCliCtr.Customization.Title;
                 rStatus.AppendText("Client Center for Configuration Manager (c) 2023 by Roger Zander\n");
-                rStatus.AppendText("Project-Page: https://github.com/rzander/sccmclictr\n");
+                rStatus.AppendText("Original project: https://github.com/rzander/sccmclictr\n");
+                rStatus.AppendText("Fork: https://github.com/drummachine24/sccmclictr\n");
+                rStatus.AppendText(".NET 10 and CIM/PowerShell modernization (2026) by Josh (drummachine24)\n");
                 rStatus.AppendText("Current Version: " + FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion.ToString() + "\n");
                 rStatus.AppendText("Assembly Version: " + Assembly.GetExecutingAssembly().GetName().Version.ToString() + "\n");
 
@@ -111,8 +113,15 @@ namespace ClientCenter
                                             {
                                                 AnonymousDelegate dUpdate = delegate ()
                                                 {
-                                                    var obj = Activator.CreateInstance(t);
-                                                    btTools.Items.Add(obj);
+                                                    try
+                                                    {
+                                                        var obj = Activator.CreateInstance(t);
+                                                        btTools.Items.Add(obj);
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        Trace.WriteLine("Plugin load failed (" + t.FullName + "): " + ex.Message);
+                                                    }
                                                 };
                                                 Dispatcher.Invoke(dUpdate);
                                             }
@@ -130,21 +139,28 @@ namespace ClientCenter
                                             {
                                                 AnonymousDelegate dUpdate = delegate ()
                                                 {
-                                                    var obj = Activator.CreateInstance(t);
-                                                    var item = ((System.Windows.Controls.ContentControl)(obj)).Content;
+                                                    try
+                                                    {
+                                                        var obj = Activator.CreateInstance(t);
+                                                        var item = ((System.Windows.Controls.ContentControl)(obj)).Content;
 
-                                                    //Get first Child Control
-                                                    var first = ((System.Windows.Controls.Panel)(item)).Children[0];
+                                                        //Get first Child Control
+                                                        var first = ((System.Windows.Controls.Panel)(item)).Children[0];
 
-                                                    //Detach first Control from Grid
-                                                    Grid par = VisualTreeHelper.GetParent(first) as Grid;
-                                                    par.Children.Remove(first);
+                                                        //Detach first Control from Grid
+                                                        Grid par = VisualTreeHelper.GetParent(first) as Grid;
+                                                        par.Children.Remove(first);
 
-                                                    //Add Control without binding to Grid
-                                                    ribCustActions.Tag = oAgent;
-                                                    ribCustActions.Items.Add(first);
-                                                    ribCustActions.IsEnabled = true;
-                                                    ribCustActions.Visibility = System.Windows.Visibility.Visible;
+                                                        //Add Control without binding to Grid
+                                                        ribCustActions.Tag = oAgent;
+                                                        ribCustActions.Items.Add(first);
+                                                        ribCustActions.IsEnabled = true;
+                                                        ribCustActions.Visibility = System.Windows.Visibility.Visible;
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        Trace.WriteLine("Plugin load failed (" + t.FullName + "): " + ex.Message);
+                                                    }
                                                 };
                                                 Dispatcher.Invoke(dUpdate);
                                             }
@@ -162,21 +178,26 @@ namespace ClientCenter
                                             {
                                                 AnonymousDelegate dUpdate = delegate ()
                                                 {
-                                                    var obj = Activator.CreateInstance(t);
-                                                    var item = ((System.Windows.Controls.ContentControl)(obj)).Content;
+                                                    try
+                                                    {
+                                                        var obj = Activator.CreateInstance(t);
+                                                        var item = ((System.Windows.Controls.ContentControl)(obj)).Content;
 
-                                                    //ribCustActions.Items.Add(obj);
+                                                        //Get first Child Control
+                                                        var first = ((System.Windows.Controls.Panel)(item)).Children[0];
 
-                                                    //Get first Child Control
-                                                    var first = ((System.Windows.Controls.Panel)(item)).Children[0];
+                                                        //Detach first Control from Grid
+                                                        Grid par = VisualTreeHelper.GetParent(first) as Grid;
+                                                        par.Children.Remove(first);
 
-                                                    //Detach first Control from Grid
-                                                    Grid par = VisualTreeHelper.GetParent(first) as Grid;
-                                                    par.Children.Remove(first);
-
-                                                    //Add Control without binding to Grid
-                                                    ribAgentActions.Items.Add(first);
-                                                    ribAgentActions.Visibility = System.Windows.Visibility.Visible;
+                                                        //Add Control without binding to Grid
+                                                        ribAgentActions.Items.Add(first);
+                                                        ribAgentActions.Visibility = System.Windows.Visibility.Visible;
+                                                    }
+                                                    catch (Exception ex)
+                                                    {
+                                                        Trace.WriteLine("Plugin load failed (" + t.FullName + "): " + ex.Message);
+                                                    }
                                                 };
                                                 Dispatcher.Invoke(dUpdate);
                                             }

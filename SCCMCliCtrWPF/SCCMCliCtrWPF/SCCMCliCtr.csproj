@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -13,6 +13,7 @@
     <LangVersion>latest</LangVersion>
     <Version>1.1.0</Version>
     <NoWarn>$(NoWarn);CA1416;SYSLIB0014</NoWarn>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,12 +29,54 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Plugin_*.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Plugin_Explorer.dll.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <ProjectReference Include="..\..\Plugins\Plugin_Explorer\Plugin_Explorer.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_RDP\Plugin_RDP.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_PSScripts\Plugin_PSScripts.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_RuckZuck\Plugin_RuckZuck.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_Regedit\Plugin_Regedit.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_MSInfo32\Plugin_MSInfo32.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_MSRA\Plugin_MSRA.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_SelfUpdate\Plugin_SelfUpdate.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_AppV46\Plugin_AppV46.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_RemoteTools\Plugin_CMRemote.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_StatusMessageViewer\Plugin_StatusMessageViewer.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_EnablePSRemoting\Plugin_EnablePSRemoting.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_FEP\Plugin_FEP.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_CompMgmt\Plugin_CompMgmt.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_ResourceExplorer\Plugin_CMResourceExplorer.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Plugins\Plugin_CustomTools_AMTTools\Plugin_CustomTools_AMTTools.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -67,9 +110,28 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Images\**\*" />
+    <Resource Include="Images\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Page Update="Themes\Generic.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
+
+  <Target Name="CopyPluginsToPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <_PluginSourceDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\</_PluginSourceDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PluginPayload Include="$(_PluginSourceDir)Plugin_*.dll" />
+      <_PluginPayload Include="$(_PluginSourceDir)RuckZuck.Base.dll" Condition="Exists('$(_PluginSourceDir)RuckZuck.Base.dll')" />
+      <_PluginPayload Include="$(_PluginSourceDir)Plugin_Explorer.dll.config" Condition="Exists('$(_PluginSourceDir)Plugin_Explorer.dll.config')" />
+      <_PsScriptPayload Include="$(MSBuildProjectDirectory)\..\..\Plugins\Plugin_PSScripts\PSScripts\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PluginPayload)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'@(_PluginPayload)' != ''" />
+    <Copy SourceFiles="@(_PsScriptPayload)" DestinationFolder="$(PublishDir)PSScripts\%(RecursiveDir)" SkipUnchangedFiles="true" Condition="'@(_PsScriptPayload)' != ''" />
+  </Target>
 
 </Project>
