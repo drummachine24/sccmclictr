@@ -3,6 +3,10 @@
 <#
 .SYNOPSIS
     Installs Client Center for Configuration Manager to Program Files.
+
+.NOTES
+    Upgrades in place instead of deleting the install folder. Locked binaries are
+    renamed aside (classic Windows replace technique) and removed now or on reboot.
 #>
 [CmdletBinding()]
 param(
@@ -14,18 +18,35 @@ $sourceDir = $PSScriptRoot
 $exeName = "SCCMCliCtrWPF.exe"
 $exePath = Join-Path $sourceDir $exeName
 
+if (-not ("ClientCenterNative" -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ClientCenterNative {
+    public const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x4;
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
+}
+"@
+}
+
 function Stop-ClientCenterProcesses {
     param([string]$TargetExePath)
 
     $stopped = $false
+    $installRoot = Split-Path -Parent $TargetExePath
 
-    # Prefer path-based match so we catch renamed/locked installs.
     try {
         $targetFull = [System.IO.Path]::GetFullPath($TargetExePath)
         Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-            Where-Object { $_.ExecutablePath -and ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetFull) } |
+            Where-Object {
+                $_.ExecutablePath -and (
+                    ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetFull) -or
+                    ($installRoot -and $_.ExecutablePath.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase))
+                )
+            } |
             ForEach-Object {
-                Write-Host "Stopping Client Center process by path (PID $($_.ProcessId))..." -ForegroundColor Yellow
+                Write-Host "Stopping process from install folder (PID $($_.ProcessId): $($_.Name))..." -ForegroundColor Yellow
                 Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
                 $stopped = $true
             }
@@ -37,7 +58,6 @@ function Stop-ClientCenterProcesses {
         $stopped = $true
     }
 
-    # taskkill writes to stderr when the process is already gone; do not treat that as fatal.
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
     try {
@@ -47,41 +67,107 @@ function Stop-ClientCenterProcesses {
         $ErrorActionPreference = $prevEap
     }
 
-    if ($stopped) {
-        Start-Sleep -Seconds 2
+    if ($stopped) { Start-Sleep -Seconds 2 }
+}
+
+function Register-DeleteOnReboot {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    [void][ClientCenterNative]::MoveFileEx($Path, $null, [ClientCenterNative]::MOVEFILE_DELAY_UNTIL_REBOOT)
+}
+
+function Remove-FileBestEffort {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
+    try {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+        return $true
+    } catch {
+        try {
+            $pending = "$Path.pendingdelete"
+            Move-Item -LiteralPath $Path -Destination $pending -Force -ErrorAction Stop
+            Register-DeleteOnReboot -Path $pending
+            return $true
+        } catch {
+            Register-DeleteOnReboot -Path $Path
+            return $false
+        }
     }
 }
 
-function Remove-InstallDirectory {
-    param([string]$Path)
+function Copy-FileReplaceLocked {
+    param(
+        [string]$Source,
+        [string]$Destination
+    )
 
-    if (-not (Test-Path $Path)) { return }
+    $destDir = Split-Path -Parent $Destination
+    if (-not (Test-Path -LiteralPath $destDir)) {
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
 
-    Write-Host "Removing previous installation..." -ForegroundColor Yellow
-
-    $installedExe = Join-Path $Path $exeName
-    Stop-ClientCenterProcesses -TargetExePath $installedExe
-
-    for ($i = 1; $i -le 5; $i++) {
+    try {
+        Copy-Item -LiteralPath $Source -Destination $Destination -Force -ErrorAction Stop
+        return
+    } catch {
+        # Windows often allows renaming an in-use binary even when overwrite/delete fails.
+        $stamp = Get-Date -Format "yyyyMMddHHmmssfff"
+        $aside = "$Destination.replaced.$stamp"
         try {
-            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            Move-Item -LiteralPath $Destination -Destination $aside -Force -ErrorAction Stop
+            Copy-Item -LiteralPath $Source -Destination $Destination -Force -ErrorAction Stop
+            if (-not (Remove-FileBestEffort -Path $aside)) {
+                Write-Host "Queued for delete on reboot: $aside" -ForegroundColor Yellow
+            }
             return
         } catch {
-            Write-Host "Retry $i/5: waiting for file locks to release..." -ForegroundColor Yellow
-            Stop-ClientCenterProcesses -TargetExePath $installedExe
-            Start-Sleep -Seconds (2 * $i)
+            throw "Could not replace locked file '$Destination'. Close Client Center / Explorer windows on the install folder and retry. Details: $($_.Exception.Message)"
         }
     }
+}
 
-    # Last resort: move the locked folder aside and continue installing.
-    $backup = "{0}.old.{1}" -f $Path, (Get-Date -Format "yyyyMMddHHmmss")
-    Write-Host "Install folder is still locked. Moving it aside to:`n  $backup" -ForegroundColor Yellow
-    try {
-        Move-Item -LiteralPath $Path -Destination $backup -Force -ErrorAction Stop
-        Write-Host "Previous files were moved aside. You can delete that folder after reboot if needed." -ForegroundColor Yellow
-    } catch {
-        throw "Unable to replace the existing installation because '$exeName' is locked. Close Client Center (and any Explorer windows on that folder), then run Install.cmd again. Details: $($_.Exception.Message)"
+function Install-PayloadInPlace {
+    param(
+        [string]$SourceRoot,
+        [string]$DestinationRoot
+    )
+
+    Write-Host "Updating files in place..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Path $DestinationRoot -Force | Out-Null
+
+    $sourceFiles = Get-ChildItem -LiteralPath $SourceRoot -Recurse -File -Force | Where-Object {
+        $_.FullName -notmatch '\\artifacts\\' -and $_.Extension -ne '.zip' -and $_.Name -notlike '*.replaced.*' -and $_.Name -notlike '*.pendingdelete'
     }
+
+    foreach ($file in $sourceFiles) {
+        $relative = $file.FullName.Substring($SourceRoot.Length).TrimStart('\')
+        $dest = Join-Path $DestinationRoot $relative
+        Copy-FileReplaceLocked -Source $file.FullName -Destination $dest
+    }
+
+    # Remove stale payload files that are no longer in the package (keep pending/replaced leftovers).
+    $sourceRelative = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($file in $sourceFiles) {
+        [void]$sourceRelative.Add($file.FullName.Substring($SourceRoot.Length).TrimStart('\'))
+    }
+
+    Get-ChildItem -LiteralPath $DestinationRoot -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -notlike '*.replaced.*' -and
+            $_.Name -notlike '*.pendingdelete' -and
+            $_.Name -ne 'ClientCenterInstall.log'
+        } |
+        ForEach-Object {
+            $rel = $_.FullName.Substring($DestinationRoot.Length).TrimStart('\')
+            if (-not $sourceRelative.Contains($rel)) {
+                [void](Remove-FileBestEffort -Path $_.FullName)
+            }
+        }
+
+    # Clean leftover replaced/pending files if unlocked now.
+    Get-ChildItem -LiteralPath $DestinationRoot -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*.replaced.*' -or $_.Name -like '*.pendingdelete' } |
+        ForEach-Object { [void](Remove-FileBestEffort -Path $_.FullName) }
 }
 
 if (-not (Test-Path $exePath)) {
@@ -92,17 +178,10 @@ $productVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
 Write-Host "Installing Client Center v$productVersion" -ForegroundColor Cyan
 Write-Host "Destination: $InstallDir" -ForegroundColor Cyan
 
-Remove-InstallDirectory -Path $InstallDir
-New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-
-# Copy payload, but skip packaging leftovers if present next to the scripts.
-Get-ChildItem -Path $sourceDir -Force | Where-Object {
-    $_.Name -notmatch '\.zip$' -and $_.Name -ne 'artifacts'
-} | ForEach-Object {
-    Copy-Item $_.FullName -Destination $InstallDir -Recurse -Force
-}
-
 $installedExe = Join-Path $InstallDir $exeName
+Stop-ClientCenterProcesses -TargetExePath $installedExe
+Install-PayloadInPlace -SourceRoot $sourceDir -DestinationRoot $InstallDir
+
 $shell = New-Object -ComObject WScript.Shell
 $startMenu = [Environment]::GetFolderPath("Programs")
 $shortcutDir = Join-Path $startMenu "Client Center for Configuration Manager"
@@ -128,7 +207,6 @@ $desktopShortcut.WorkingDirectory = $InstallDir
 $desktopShortcut.Description = "Client Center for Configuration Manager v$productVersion"
 $desktopShortcut.Save()
 
-# Register for Apps & Features / Add or Remove Programs.
 $uninstallRegPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ClientCenterForConfigMgr"
 New-Item -Path $uninstallRegPath -Force | Out-Null
 Set-ItemProperty -Path $uninstallRegPath -Name "DisplayName" -Value "Client Center for Configuration Manager"
@@ -147,3 +225,4 @@ try {
 Write-Host "Installation complete." -ForegroundColor Green
 Write-Host "Start Menu: $shortcutDir" -ForegroundColor Green
 Write-Host "Desktop shortcut created." -ForegroundColor Green
+Write-Host "Tip: if an older .exe.replaced.* file remains, it will be removed on next reboot." -ForegroundColor DarkGray

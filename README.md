@@ -9,7 +9,12 @@ The tool is designed for IT Professionals to troubleshoot ConfigMgr Agent relate
 ### GitHub Releases (recommended)
 https://github.com/drummachine24/sccmclictr/releases
 
-Self-contained zip includes the .NET runtime. Extract and run `Install.cmd` as administrator, or launch `SCCMCliCtrWPF.exe` directly.
+Each release includes:
+- **Setup.exe** — interactive installer (Inno Setup)
+- **MSI** — enterprise / silent install (`msiexec /i ... /qn`)
+- **Portable ZIP** — extract and run, or use `Install.cmd`
+
+All packages are self-contained (no separate .NET install required).
 
 ### Build from source
 ```bash
@@ -18,7 +23,13 @@ dotnet restore SCCMCliCtrWPF/SCCMCliCtrWPF.sln
 dotnet build SCCMCliCtrWPF/SCCMCliCtrWPF.sln -c Release
 ```
 
-Self-contained release packaging (Windows): `tools/Build-Release.ps1`
+Release packaging on Windows (ZIP + MSI + Setup.exe):
+
+```powershell
+.\tools\Build-Release.ps1 -Version 1.1.4
+```
+
+Requires [WiX Toolset](https://wixtoolset.org/) CLI (`dotnet tool install -g wix`) and [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the MSI/EXE outputs.
 
 ## Documentation
 https://github.com/rzander/sccmclictr/wiki
