@@ -37,8 +37,15 @@ function Stop-ClientCenterProcesses {
         $stopped = $true
     }
 
-    & taskkill.exe /F /IM $exeName /T 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $stopped = $true }
+    # taskkill writes to stderr when the process is already gone; do not treat that as fatal.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        $null = & taskkill.exe /F /IM $exeName /T 2>&1
+        if ($LASTEXITCODE -eq 0) { $stopped = $true }
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
 
     if ($stopped) {
         Start-Sleep -Seconds 2

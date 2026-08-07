@@ -30,8 +30,15 @@ function Stop-ClientCenterProcesses {
         Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
     }
 
-    & taskkill.exe /F /IM $exeName /T 2>$null | Out-Null
-    Start-Sleep -Seconds 2
+    # taskkill writes to stderr when the process is already gone; do not treat that as fatal.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        $null = & taskkill.exe /F /IM $exeName /T 2>&1
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    Start-Sleep -Seconds 1
 }
 
 $installedExe = Join-Path $InstallDir $exeName
