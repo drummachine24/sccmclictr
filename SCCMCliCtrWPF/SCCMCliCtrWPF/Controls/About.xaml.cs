@@ -41,7 +41,7 @@ namespace ClientCenter.Controls
         {
             try
             {
-                Process.Start(new ProcessStartInfo("https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=TLTFJHYA69VHU") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("https://www.paypal.com/ncp/payment/VEUDU4YDUB3KQ") { UseShellExecute = true });
                 e.Handled = true;
             }
             catch { }
