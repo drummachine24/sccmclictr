@@ -828,20 +828,24 @@ namespace ClientCenter
                 Explorer.StartInfo.FileName = "powershell.exe";
                 string sPS = string.Format(Properties.Settings.Default.OpenPSConsoleCommand, oAgent.TargetHostname, tb_wsmanport.Text);
                 if ((bool)cb_ssl.IsChecked) sPS += " -UseSSL";
-                Explorer.StartInfo.Arguments = @"-NoExit -Command " + sPS;
 
                 if (!string.IsNullOrEmpty(tb_Username.Text))
                 {
-                    System.Management.Automation.PSCredential credential = new System.Management.Automation.PSCredential(tb_Username.Text, pb_Password.SecurePassword);
-                    string serializedCred = System.Management.Automation.PSSerializer.Serialize(credential);
-                    string filename = System.IO.Path.GetTempFileName();
-                    File.WriteAllText(filename, serializedCred);
-                    string creds = "(Import-Clixml " + filename + ")";
-                    //creds += "; rm " + filename;
-
-                    Explorer.StartInfo.Arguments += " -Credential " + creds;
+                    // Build a Windows PowerShell 5.1-compatible credential inline.
+                    // PSSerializer/Import-Clixml from the PowerShell SDK (7.x) is not reliable with powershell.exe 5.1.
+                    string userEsc = tb_Username.Text.Replace("'", "''");
+                    string passEsc = pb_Password.Password.Replace("'", "''");
+                    string credCmd = string.Format(
+                        "$cred = New-Object System.Management.Automation.PSCredential('{0}', (ConvertTo-SecureString '{1}' -AsPlainText -Force)); {2} -Credential $cred",
+                        userEsc, passEsc, sPS);
+                    Explorer.StartInfo.Arguments = @"-NoExit -Command " + credCmd;
+                }
+                else
+                {
+                    Explorer.StartInfo.Arguments = @"-NoExit -Command " + sPS;
                 }
 
+                Explorer.StartInfo.UseShellExecute = true;
                 Explorer.StartInfo.WindowStyle = ProcessWindowStyle.Normal;
 
                 Explorer.Start();

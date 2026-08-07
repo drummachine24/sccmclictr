@@ -55,7 +55,13 @@ namespace ClientCenter
                         dataGrid1.ItemsSource = iServices;
                         dataGrid1.EndInit();
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        if (Listener != null)
+                            Listener.WriteError(ex.Message);
+                        else
+                            Trace.WriteLine(ex.ToString());
+                    }
                     Mouse.OverrideCursor = Cursors.Arrow;
                 }
             }

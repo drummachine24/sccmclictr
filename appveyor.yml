@@ -1,7 +1,16 @@
 version: 1.1.{build}
 image: Visual Studio 2022
 install:
-- ps: dotnet --version
+- ps: |
+    git submodule update --init --recursive
+    # Ensure a .NET 10 SDK matching global.json (rollForward: latestMinor)
+    $sdk = "10.0.300"
+    if (-not (dotnet --list-sdks | Select-String -SimpleMatch $sdk)) {
+      Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile "$env:TEMP\dotnet-install.ps1"
+      & "$env:TEMP\dotnet-install.ps1" -Channel 10.0 -InstallDir "$env:ProgramFiles\dotnet"
+    }
+    dotnet --version
+    dotnet --list-sdks
 before_build:
 - ps: dotnet restore SCCMCliCtrWPF\SCCMCliCtrWPF.sln
 build:

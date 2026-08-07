@@ -132,7 +132,7 @@ namespace AgentActionTools
         {
             try
             {
-                Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri));
+                Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
                 e.Handled = true;
             }
             catch { }
@@ -390,7 +390,7 @@ namespace AgentActionTools
             {
                 if (lvSW.SelectedItems.Count > 0)
                 {
-                    Process.Start(((GetSoftware)lvSW.SelectedItem).ProductURL.ToString());
+                    Process.Start(new ProcessStartInfo(((GetSoftware)lvSW.SelectedItem).ProductURL.ToString()) { UseShellExecute = true });
                 }
             }
             catch { }

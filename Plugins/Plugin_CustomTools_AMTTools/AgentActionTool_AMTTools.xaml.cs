@@ -16,7 +16,6 @@ using System.IO;
 using sccmclictr.automation;
 
 using System.Net;
-using System.Web;
 using System.Management.Automation;
 using System.Collections.ObjectModel;
 
@@ -186,8 +185,8 @@ namespace AgentActionTools
                 else
                 {
                     MessageBox.Show("IntelvProSCCMAddOn-v2.zip could not be downloaded, try manually. Copy the required Files to: " + svProDir);
-                    Process.Start("http://downloadmirror.intel.com/21835/eng/IntelvProSCCMAddOn-v2.zip");
-                    Process.Start(svProDir);
+                    Process.Start(new ProcessStartInfo("http://downloadmirror.intel.com/21835/eng/IntelvProSCCMAddOn-v2.zip") { UseShellExecute = true });
+                    Process.Start(new ProcessStartInfo(svProDir) { UseShellExecute = true });
                 }
 
                 StartCheck();

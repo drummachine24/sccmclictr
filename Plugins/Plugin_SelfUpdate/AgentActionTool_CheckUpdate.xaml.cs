@@ -69,7 +69,7 @@ namespace AgentActionTools
                                 {
                                     try
                                     {
-                                        Process.Start(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"), "install \"SCCMCliCtr\"");
+                                        Process.Start(new ProcessStartInfo(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"), "install \"SCCMCliCtr\"") { UseShellExecute = true });
                                         Process.GetCurrentProcess().Kill();
                                     }
                                     catch
@@ -159,7 +159,7 @@ namespace AgentActionTools
                                     }
                                 }).Start();*/
 
-                                Process.Start(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"), "SCCMCliCtr");
+                                Process.Start(new ProcessStartInfo(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"), "SCCMCliCtr") { UseShellExecute = true });
                                 Process.GetCurrentProcess().Kill();
                             }
 
