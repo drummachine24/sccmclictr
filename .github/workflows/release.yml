@@ -67,7 +67,7 @@ jobs:
 
             ### Highlights
             - Self-contained Windows x64 build (no separate .NET install required)
-            - Hardened installer: force-stop locked processes, retry delete, move-aside fallback
+            - Hardened installer: in-place replace with rename-locked-file and reboot cleanup
             - .NET 10 / CIM Monitoring and Services grid fixes (1.1.1+)
             - Apps and Features registration with Start Menu uninstall
 
