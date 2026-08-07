@@ -596,6 +596,7 @@ namespace ClientCenter
                     applicationGrid1.Listener = myTrace;
                     eventMonitoring1.Listener = myTrace;
                     invInstalledSWGrid.Listener = myTrace;
+                    appXPackagesGrid.Listener = myTrace;
                     serviceWindowGrid1.Listener = myTrace;
                     CollectionVariablesGrid1.Listener = myTrace;
                     SettingsMgmtGrid.Listener = myTrace;
@@ -684,6 +685,9 @@ namespace ClientCenter
                                         break;
                                     case "InvInstalledSW":
                                         invInstalledSWGrid.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "InvAppX":
+                                        appXPackagesGrid.SCCMAgentConnection = oAgent;
                                         break;
                                     case "ServiceWindow":
                                         serviceWindowGrid1.SCCMAgentConnection = oAgent;

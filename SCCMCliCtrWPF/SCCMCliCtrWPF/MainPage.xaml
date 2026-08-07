@@ -245,6 +245,14 @@
                                                 </StackPanel>
                                             </TreeViewItem.Header>
                                         </TreeViewItem>
+                                        <TreeViewItem IsExpanded="True" IsSelected="False" Tag="InvAppX" Name="tviAppXPackages">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal" >
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/setupold.ico" Stretch="Uniform" Width="16" Height="16"/>
+                                                    <TextBlock Text="AppX Packages" Margin="3,0,0,0" ToolTip="List and remove AppX / Store packages."></TextBlock>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
                                         <TreeViewItem IsExpanded="True" IsSelected="True" Tag="Collectionvariables" Name="tviCollectionvariables">
                                             <TreeViewItem.Header>
                                                 <StackPanel Orientation="Horizontal" >
@@ -431,6 +439,11 @@
                         <TabItem Header="InstalledSW" Tag="InvInstalledSW" Name="InstalledSWTab">
                             <Grid>
                                 <my6:InstalledSoftwareGrid x:Name="invInstalledSWGrid" />
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="AppX Packages" Tag="InvAppX" Name="AppXPackagesTab">
+                            <Grid>
+                                <my6:AppXPackagesGrid x:Name="appXPackagesGrid" />
                             </Grid>
                         </TabItem>
                         <TabItem Header="EventMonitoring" Tag="EventMonitoring" Name="EventMonitoringTab">
