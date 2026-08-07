@@ -27,7 +27,6 @@
     <Feature Id="ProductFeature" Title="Client Center" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="ApplicationShortcut" />
-      <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -37,8 +36,6 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="Client Center for Configuration Manager" />
     </StandardDirectory>
-
-    <StandardDirectory Id="DesktopFolder" />
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <!-- Harvest publish output; exclude portable PowerShell install helpers (ZIP-only). -->
@@ -62,22 +59,6 @@
           Root="HKLM"
           Key="Software\drummachine24\ClientCenter"
           Name="StartMenuShortcut"
-          Type="integer"
-          Value="1"
-          KeyPath="yes" />
-    </Component>
-
-    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="C2D3E4F5-A6B7-4890-9BCD-EF0123456789">
-      <Shortcut
-          Id="DesktopShortcutLink"
-          Name="Client Center"
-          Description="Client Center for Configuration Manager"
-          Target="[INSTALLFOLDER]SCCMCliCtrWPF.exe"
-          WorkingDirectory="INSTALLFOLDER" />
-      <RegistryValue
-          Root="HKLM"
-          Key="Software\drummachine24\ClientCenter"
-          Name="DesktopShortcut"
           Type="integer"
           Value="1"
           KeyPath="yes" />
