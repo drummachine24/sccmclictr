@@ -6,8 +6,10 @@ The tool is designed for IT Professionals to troubleshoot ConfigMgr Agent relate
 [![paypal](https://www.paypalobjects.com/en_US/CH/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=TLTFJHYA69VHU)
 
 ## Downloads
-### offline Installer
+### GitHub Releases (recommended)
 https://github.com/drummachine24/sccmclictr/releases
+
+Self-contained zip includes the .NET runtime. Extract and run `Install.cmd` as administrator, or launch `SCCMCliCtrWPF.exe` directly.
 
 ### Build from source
 ```bash
@@ -23,7 +25,8 @@ https://github.com/rzander/sccmclictr/wiki
 
 ## Requirements
 * Windows Remote Management (WinRM) must be enabled and configured on all target computers. (Run `winrm quickconfig` in a command prompt.)
-* **.NET 10 Desktop Runtime / SDK** on the computer running the tool (see `global.json`; target TFM is `net10.0-windows`)
+* **Self-contained release:** no separate .NET install required on the Client Center machine
+* **Framework-dependent / source builds:** .NET 10 Desktop Runtime / SDK (see `global.json`; TFM `net10.0-windows`)
 * Configuration Manager Agent on the target computer
 * Admin rights on the target computer
 * PowerShell remoting on the target computer (Windows PowerShell 5.1 is the typical WinRM endpoint)
