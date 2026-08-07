@@ -12,15 +12,33 @@ param(
 $ErrorActionPreference = "Stop"
 $exeName = "SCCMCliCtrWPF.exe"
 
+if (-not ("ClientCenterNative" -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ClientCenterNative {
+    public const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x4;
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
+}
+"@
+}
+
 function Stop-ClientCenterProcesses {
     param([string]$TargetExePath)
 
+    $installRoot = Split-Path -Parent $TargetExePath
     try {
         $targetFull = [System.IO.Path]::GetFullPath($TargetExePath)
         Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-            Where-Object { $_.ExecutablePath -and ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetFull) } |
+            Where-Object {
+                $_.ExecutablePath -and (
+                    ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $targetFull) -or
+                    ($installRoot -and $_.ExecutablePath.StartsWith($installRoot, [System.StringComparison]::OrdinalIgnoreCase))
+                )
+            } |
             ForEach-Object {
-                Write-Host "Stopping Client Center process by path (PID $($_.ProcessId))..." -ForegroundColor Yellow
+                Write-Host "Stopping process from install folder (PID $($_.ProcessId): $($_.Name))..." -ForegroundColor Yellow
                 Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
             }
     } catch { }
@@ -30,7 +48,6 @@ function Stop-ClientCenterProcesses {
         Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
     }
 
-    # taskkill writes to stderr when the process is already gone; do not treat that as fatal.
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
     try {
@@ -41,6 +58,12 @@ function Stop-ClientCenterProcesses {
     Start-Sleep -Seconds 1
 }
 
+function Register-DeleteOnReboot {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    [void][ClientCenterNative]::MoveFileEx($Path, $null, [ClientCenterNative]::MOVEFILE_DELAY_UNTIL_REBOOT)
+}
+
 $installedExe = Join-Path $InstallDir $exeName
 Stop-ClientCenterProcesses -TargetExePath $installedExe
 
@@ -48,24 +71,41 @@ $startMenu = [Environment]::GetFolderPath("Programs")
 $shortcutDir = Join-Path $startMenu "Client Center for Configuration Manager"
 $desktop = [Environment]::GetFolderPath("Desktop")
 
-if (Test-Path $shortcutDir) { Remove-Item $shortcutDir -Recurse -Force }
+if (Test-Path $shortcutDir) { Remove-Item $shortcutDir -Recurse -Force -ErrorAction SilentlyContinue }
 $desktopShortcut = Join-Path $desktop "Client Center.lnk"
-if (Test-Path $desktopShortcut) { Remove-Item $desktopShortcut -Force }
+if (Test-Path $desktopShortcut) { Remove-Item $desktopShortcut -Force -ErrorAction SilentlyContinue }
 
 if (Test-Path $InstallDir) {
-    for ($i = 1; $i -le 5; $i++) {
+    Write-Host "Removing installation files..." -ForegroundColor Cyan
+    # Delete files individually so a single locked binary does not block the rest.
+    Get-ChildItem -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending |
+        ForEach-Object {
+            try {
+                Remove-Item -LiteralPath $_.FullName -Force -Recurse -ErrorAction Stop
+            } catch {
+                try {
+                    if (-not $_.PSIsContainer) {
+                        $pending = "$($_.FullName).pendingdelete"
+                        Move-Item -LiteralPath $_.FullName -Destination $pending -Force -ErrorAction Stop
+                        Register-DeleteOnReboot -Path $pending
+                        Write-Host "Queued for delete on reboot: $pending" -ForegroundColor Yellow
+                    } else {
+                        Register-DeleteOnReboot -Path $_.FullName
+                    }
+                } catch {
+                    Register-DeleteOnReboot -Path $_.FullName
+                    Write-Host "Queued for delete on reboot: $($_.FullName)" -ForegroundColor Yellow
+                }
+            }
+        }
+
+    if (Test-Path -LiteralPath $InstallDir) {
         try {
             Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction Stop
-            break
         } catch {
-            Write-Host "Retry $i/5: waiting for file locks to release..." -ForegroundColor Yellow
-            Stop-ClientCenterProcesses -TargetExePath $installedExe
-            Start-Sleep -Seconds (2 * $i)
-            if ($i -eq 5) {
-                $backup = "{0}.old.{1}" -f $InstallDir, (Get-Date -Format "yyyyMMddHHmmss")
-                Write-Host "Folder still locked. Moving aside to:`n  $backup" -ForegroundColor Yellow
-                Move-Item -LiteralPath $InstallDir -Destination $backup -Force
-            }
+            Register-DeleteOnReboot -Path $InstallDir
+            Write-Host "Install folder queued for delete on reboot." -ForegroundColor Yellow
         }
     }
 }
