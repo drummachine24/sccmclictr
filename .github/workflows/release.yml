@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without v prefix (e.g. 1.1.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $v = "${{ inputs.version }}".Trim().TrimStart('v')
+          } else {
+            $v = "${{ github.ref_name }}".TrimStart('v')
+          }
+          if ([string]::IsNullOrWhiteSpace($v)) { throw "Version could not be resolved." }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Building release version $v"
+
+      - name: Build self-contained package
+        shell: pwsh
+        run: .\tools\Build-Release.ps1 -Version "${{ steps.ver.outputs.version }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClientCenter-v${{ steps.ver.outputs.version }}-win-x64
+          path: artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: v${{ steps.ver.outputs.version }} - Client Center
+          draft: false
+          generate_release_notes: true
+          files: artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip
+          body: |
+            ## Client Center for Configuration Manager v${{ steps.ver.outputs.version }}
+
+            Self-contained Windows x64 build (no separate .NET install required).
+
+            ### Highlights in 1.1.1
+            - Fix blank Monitoring/Services grids after CIM migration
+            - Software update install script fixes
+            - Enable WinRM plugin works on PowerShell 7 SDK hosts
+            - Open PS Console credential handoff for Windows PowerShell 5.1
+            - Installer registers Apps and Features entry and stops running instances on upgrade
+
+            ### Install
+            1. Download `ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip`
+            2. Extract the archive
+            3. Run `Install.cmd` as administrator (or run `SCCMCliCtrWPF.exe` directly)
+
+            ### Uninstall
+            Run `Uninstall.cmd`, use the Start Menu uninstall shortcut, or remove via Apps and Features.
+
+            ### Requirements
+            - Windows 10/11 x64 on the machine running Client Center
+            - WinRM, ConfigMgr agent, and admin rights on target systems for remote troubleshooting
+
+            ### Links
+            - Fork: https://github.com/drummachine24/sccmclictr
+            - Original project: https://github.com/rzander/sccmclictr
+
+            Copyright (C) 2023 by Roger Zander. MS-PL license.

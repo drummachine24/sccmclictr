@@ -7,7 +7,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.1.0",
+    [string]$Version = "1.1.1",
     [switch]$SkipZip
 )
 
@@ -59,6 +59,7 @@ try {
     Copy-Item (Join-Path $PSScriptRoot "Install-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Uninstall-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Install.cmd") $publishDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "Uninstall.cmd") $publishDir -Force
 
     @"
 Client Center for Configuration Manager v$Version
@@ -70,6 +71,10 @@ Install (admin PowerShell):
   .\Install-ClientCenter.ps1
 
 Or double-click Install.cmd and approve the UAC prompt.
+
+Uninstall:
+  .\Uninstall.cmd
+  (or use Apps & Features after install)
 
 Run without installing:
   .\SCCMCliCtrWPF.exe
