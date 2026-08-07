@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version without v prefix (e.g. 1.1.2)"
+        description: "Version without v prefix (e.g. 1.1.4)"
         required: true
         type: string
 
@@ -41,15 +41,32 @@ jobs:
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Building release version $v"
 
-      - name: Build self-contained package
+      - name: Install WiX CLI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix --version
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            throw "Inno Setup ISCC.exe not found after chocolatey install."
+          }
+
+      - name: Build ZIP, MSI, and Setup.exe
         shell: pwsh
         run: .\tools\Build-Release.ps1 -Version "${{ steps.ver.outputs.version }}"
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ClientCenter-v${{ steps.ver.outputs.version }}-win-x64
-          path: artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip
+          path: |
+            artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip
+            artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64.msi
+            artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-setup.exe
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -59,25 +76,34 @@ jobs:
           name: v${{ steps.ver.outputs.version }} - Client Center
           draft: false
           generate_release_notes: true
-          files: artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip
+          files: |
+            artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-setup.exe
+            artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64.msi
+            artifacts/ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip
           body: |
             ## Client Center for Configuration Manager v${{ steps.ver.outputs.version }}
 
             Self-contained Windows x64 build (no separate .NET install required).
 
-            ### Highlights
-            - Self-contained Windows x64 build (no separate .NET install required)
-            - Hardened installer: in-place replace with rename-locked-file and reboot cleanup
-            - .NET 10 / CIM Monitoring and Services grid fixes (1.1.1+)
-            - Apps and Features registration with Start Menu uninstall
+            ### Download options
+            | Artifact | Use when |
+            |---|---|
+            | `ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-setup.exe` | Interactive wizard install (recommended for most users) |
+            | `ClientCenter-v${{ steps.ver.outputs.version }}-win-x64.msi` | Enterprise / Software Center / silent install |
+            | `ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip` | Portable / scripted copy without a Windows installer |
 
             ### Install
-            1. Download `ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip`
-            2. Extract the archive
-            3. Run `Install.cmd` as administrator (or run `SCCMCliCtrWPF.exe` directly)
+            **Setup.exe:** run the wizard as administrator.
+
+            **MSI (silent):**
+            ```
+            msiexec /i ClientCenter-v${{ steps.ver.outputs.version }}-win-x64.msi /qn
+            ```
+
+            **Portable ZIP:** extract, then run `Install.cmd` as administrator, or launch `SCCMCliCtrWPF.exe` directly.
 
             ### Uninstall
-            Run `Uninstall.cmd`, use the Start Menu uninstall shortcut, or remove via Apps and Features.
+            Use Apps & Features / Add or Remove Programs (EXE and MSI), or `Uninstall.cmd` from the portable ZIP.
 
             ### Requirements
             - Windows 10/11 x64 on the machine running Client Center

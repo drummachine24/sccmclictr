@@ -1,14 +1,17 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds a self-contained Client Center release package (no .NET runtime install required).
+    Builds Client Center release artifacts: portable ZIP, MSI, and Setup.exe.
 #>
 [CmdletBinding()]
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$Version = "1.1.4",
-    [switch]$SkipZip
+    [switch]$SkipZip,
+    [switch]$SkipMsi,
+    [switch]$SkipExe,
+    [switch]$SkipInstallers
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,7 +25,6 @@ Push-Location $repoRoot
 try {
     Write-Host "Building plugins and dependencies ($Configuration)..." -ForegroundColor Cyan
     dotnet build $project -c $Configuration
-
     if (-not $?) { throw "Build failed." }
 
     if (Test-Path $publishDir) {
@@ -34,7 +36,6 @@ try {
         -p:PublishSingleFile=false `
         -p:PublishReadyToRun=true `
         -o $publishDir
-
     if (-not $?) { throw "Publish failed." }
 
     $pluginDir = Join-Path $repoRoot "SCCMCliCtrWPF\SCCMCliCtrWPF\bin\$Configuration\net10.0-windows"
@@ -56,6 +57,7 @@ try {
         Copy-Item (Join-Path $psScriptsSrc "*") $psScriptsDst -Recurse -Force
     }
 
+    # Portable ZIP helpers (not used by MSI/EXE installers).
     Copy-Item (Join-Path $PSScriptRoot "Install-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Uninstall-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Install.cmd") $publishDir -Force
@@ -67,21 +69,21 @@ Client Center for Configuration Manager v$Version
 
 Self-contained build for $Runtime (includes .NET runtime — no separate .NET install needed).
 
-Install (admin PowerShell):
-  .\Install-ClientCenter.ps1
+Preferred installers (from GitHub Releases):
+  - ClientCenter-v$Version-win-x64-setup.exe  (wizard)
+  - ClientCenter-v$Version-win-x64.msi          (enterprise / silent)
 
-Or double-click Install.cmd and approve the UAC prompt.
+Portable ZIP options:
+  Install:   .\Install.cmd  (admin)
+  Uninstall: .\Uninstall.cmd
+  Or run:    .\SCCMCliCtrWPF.exe
 
-Uninstall:
-  .\Uninstall.cmd
-  (or use Apps & Features after install)
-
-Run without installing:
-  .\SCCMCliCtrWPF.exe
+Silent MSI example:
+  msiexec /i ClientCenter-v$Version-win-x64.msi /qn
 
 Requirements on THIS machine:
   - Windows 10/11 x64
-  - Administrator rights (recommended)
+  - Administrator rights for installers
 
 Requirements on TARGET machines (SCCM troubleshooting):
   - WinRM enabled
@@ -102,9 +104,24 @@ Modernization (2026): Josh (drummachine24)
 
     if (-not $SkipZip) {
         if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-        Write-Host "Creating zip: $zipPath" -ForegroundColor Cyan
+        Write-Host "Creating portable zip: $zipPath" -ForegroundColor Cyan
         Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
         Write-Host "Zip created." -ForegroundColor Green
+    }
+
+    if (-not $SkipInstallers) {
+        & (Join-Path $PSScriptRoot "Build-Installers.ps1") `
+            -PublishDir $publishDir `
+            -Version $Version `
+            -OutputDir $artifactsRoot `
+            -SkipMsi:$SkipMsi `
+            -SkipExe:$SkipExe
+        if (-not $?) { throw "Installer build failed." }
+    }
+
+    Write-Host "Release artifacts in: $artifactsRoot" -ForegroundColor Green
+    Get-ChildItem $artifactsRoot -File | Sort-Object Name | ForEach-Object {
+        Write-Host ("  {0} ({1:N1} MB)" -f $_.Name, ($_.Length / 1MB))
     }
 }
 finally {
