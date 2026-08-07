@@ -27,8 +27,8 @@ namespace AgentActionTools
                     System.Reflection.PropertyInfo pInfo = t.GetProperty("Hostname");
                     string sHost = (string)pInfo.GetValue(null, null);
 
-                    //Run PS to enable WinRM
-                    string sPSCode = "Invoke-WmiMethod -ComputerName " + sHost + " -Namespace root\\cimv2 -Class Win32_Process -Name Create -ArgumentList '\"C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe\" \"Enable-PSRemoting -Force\"'";
+                    //Run PS to enable WinRM via CIM (Invoke-WmiMethod is unavailable in PowerShell 7 SDK hosts)
+                    string sPSCode = "Invoke-CimMethod -ComputerName " + sHost + " -Namespace root\\cimv2 -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine='\"C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\powershell.exe\" \"Enable-PSRemoting -Force\"'}";
                     PowerShell PowerShellInstance = PowerShell.Create();
                     PowerShellInstance.AddScript(sPSCode);
 

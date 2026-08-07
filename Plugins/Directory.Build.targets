@@ -16,4 +16,16 @@
     <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(_AppOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
     <Copy SourceFiles="@(ReferenceCopyLocalPaths)" DestinationFolder="$(_AppOutputDir)" SkipUnchangedFiles="true" Condition="'@(ReferenceCopyLocalPaths)' != ''" />
   </Target>
+
+  <!-- Plugin_PSScripts ships script content; copy it next to the app so F5/dotnet build matches release packaging. -->
+  <Target Name="CopyPSScriptsToAppOutput" AfterTargets="CopyPluginToAppOutput" Condition="'$(MSBuildProjectName)' == 'Plugin_PSScripts'">
+    <PropertyGroup>
+      <_AppOutputDir>$(MSBuildThisFileDirectory)..\SCCMCliCtrWPF\SCCMCliCtrWPF\bin\$(Configuration)\$(TargetFramework)\</_AppOutputDir>
+      <_PSScriptsSrc>$(MSBuildProjectDirectory)\PSScripts</_PSScriptsSrc>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PSScriptFiles Include="$(_PSScriptsSrc)\**\*" Condition="Exists('$(_PSScriptsSrc)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PSScriptFiles)" DestinationFiles="@(_PSScriptFiles->'$(_AppOutputDir)PSScripts\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(_PSScriptFiles)' != ''" />
+  </Target>
 </Project>
