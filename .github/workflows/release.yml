@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version without v prefix (e.g. 1.1.1)"
+        description: "Version without v prefix (e.g. 1.1.2)"
         required: true
         type: string
 
@@ -65,12 +65,11 @@ jobs:
 
             Self-contained Windows x64 build (no separate .NET install required).
 
-            ### Highlights in 1.1.1
-            - Fix blank Monitoring/Services grids after CIM migration
-            - Software update install script fixes
-            - Enable WinRM plugin works on PowerShell 7 SDK hosts
-            - Open PS Console credential handoff for Windows PowerShell 5.1
-            - Installer registers Apps and Features entry and stops running instances on upgrade
+            ### Highlights
+            - Self-contained Windows x64 build (no separate .NET install required)
+            - Hardened installer: force-stop locked processes, retry delete, move-aside fallback
+            - .NET 10 / CIM Monitoring and Services grid fixes (1.1.1+)
+            - Apps and Features registration with Start Menu uninstall
 
             ### Install
             1. Download `ClientCenter-v${{ steps.ver.outputs.version }}-win-x64-selfcontained.zip`
