@@ -103,20 +103,39 @@ if (-not $SkipMsi) {
     $wixExe = Install-WixCli
     if (Test-Path -LiteralPath $msiPath) { Remove-Item -LiteralPath $msiPath -Force }
 
-    # Ensure the standard UI dialog set is available (Finish / completion page).
-    Write-Host "Ensuring WixToolset.UI.wixext is installed..." -ForegroundColor Cyan
-    & $wixExe extension add "WixToolset.UI.wixext/5.0.2"
+    # Cache the UI extension globally so `wix build -ext` can resolve it in CI.
+    $uiExtId = "WixToolset.UI.wixext/5.0.2"
+    Write-Host "Ensuring $uiExtId is installed (global)..." -ForegroundColor Cyan
+    & $wixExe extension add --global $uiExtId
     if (-not $?) {
-        # Already present is fine; force-add when add fails for other reasons.
-        & $wixExe extension add "WixToolset.UI.wixext/5.0.2" --force
+        Write-Host "Retrying UI extension install with --force..." -ForegroundColor Yellow
+        & $wixExe extension add --global $uiExtId --force
+        if (-not $?) {
+            throw "Failed to install $uiExtId."
+        }
     }
 
     $wxs = Join-Path $installerDir "ClientCenter.wxs"
     $bindPath = (Resolve-Path -LiteralPath $PublishDir).Path
+
+    # Prefer an explicit DLL path when present (most reliable for GHA runners).
+    $uiExtDllCandidates = @(
+        (Join-Path $env:USERPROFILE ".wix\extensions\WixToolset.UI.wixext\5.0.2\wixext5\WixToolset.UI.wixext.dll"),
+        (Join-Path $env:USERPROFILE ".wix\extensions\WixToolset.UI.wixext\5.0.2\wixext4\WixToolset.UI.wixext.dll")
+    )
+    $uiExtArg = $uiExtId
+    foreach ($candidate in $uiExtDllCandidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            $uiExtArg = $candidate
+            Write-Host "Using UI extension DLL: $uiExtArg" -ForegroundColor Cyan
+            break
+        }
+    }
+
     Push-Location $installerDir
     try {
         & $wixExe build $wxs `
-            -ext WixToolset.UI.wixext `
+            -ext $uiExtArg `
             -bindpath "PublishDir=$bindPath" `
             -d "Version=$msiVersion" `
             -arch x64 `
