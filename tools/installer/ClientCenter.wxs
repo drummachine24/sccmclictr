@@ -2,9 +2,10 @@
 <!--
   Client Center for Configuration Manager - WiX v5 package definition.
   Built by tools/Build-Installers.ps1 via:
-    wix build ClientCenter.wxs -bindpath PublishDir=... -d Version=1.1.7.0 -o ...
+    wix build ClientCenter.wxs -ext WixToolset.UI.wixext -bindpath PublishDir=... -d Version=1.1.7.0 -o ...
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
       Name="Client Center for Configuration Manager"
       Manufacturer="drummachine24"
@@ -23,6 +24,12 @@
         Schedule="afterInstallInitialize" />
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Standard wizard UI: license/welcome -> progress -> completion (Finish).
+         Silent installs (/qn, /quiet) still skip UI as expected. -->
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Client Center was installed successfully." />
 
     <Feature Id="ProductFeature" Title="Client Center" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
