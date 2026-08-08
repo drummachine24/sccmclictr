@@ -44,10 +44,12 @@ jobs:
       - name: Install WiX CLI
         shell: pwsh
         run: |
+          # WiX writes warnings to stderr; don't treat that as a failing step.
+          $PSNativeCommandUseErrorActionPreference = $false
           dotnet tool install --global wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { throw "dotnet tool install wix failed ($LASTEXITCODE)" }
           wix --version
-          wix extension add --global WixToolset.UI.wixext/5.0.2
-          wix extension list
+          # UI extension is resolved by tools/Build-Installers.ps1 via NuGet DLL download.
 
       - name: Install Inno Setup
         shell: pwsh

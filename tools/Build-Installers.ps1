@@ -98,54 +98,85 @@ function Install-InnoSetup {
     return $iscc
 }
 
+function Get-WixUiExtensionDll {
+    param(
+        [string]$Version = "5.0.2"
+    )
+
+    $cached = @(
+        (Join-Path $env:USERPROFILE ".wix\extensions\WixToolset.UI.wixext\$Version\wixext5\WixToolset.UI.wixext.dll"),
+        (Join-Path $env:LOCALAPPDATA "wix-extensions\WixToolset.UI.wixext\$Version\wixext5\WixToolset.UI.wixext.dll")
+    )
+    foreach ($path in $cached) {
+        if (Test-Path -LiteralPath $path) { return $path }
+    }
+
+    # Prefer NuGet download: reliable on CI and avoids PowerShell treating
+    # `wix extension add` stderr/warnings as fatal ($PSNativeCommandUseErrorActionPreference).
+    $destRoot = Join-Path $env:LOCALAPPDATA "wix-extensions\WixToolset.UI.wixext\$Version"
+    $dllPath = Join-Path $destRoot "wixext5\WixToolset.UI.wixext.dll"
+    if (-not (Test-Path -LiteralPath $dllPath)) {
+        Write-Host "Downloading WixToolset.UI.wixext $Version from NuGet..." -ForegroundColor Cyan
+        $tmp = Join-Path $env:TEMP ("wixui-" + [guid]::NewGuid().ToString("n"))
+        New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+        try {
+            $nupkg = Join-Path $tmp "WixToolset.UI.wixext.$Version.nupkg"
+            $url = "https://api.nuget.org/v3-flatcontainer/wixtoolset.ui.wixext/$Version/wixtoolset.ui.wixext.$Version.nupkg"
+            Invoke-WebRequest -Uri $url -OutFile $nupkg -UseBasicParsing
+            $extract = Join-Path $tmp "extract"
+            Expand-Archive -LiteralPath $nupkg -DestinationPath $extract -Force
+            $srcDll = Join-Path $extract "wixext5\WixToolset.UI.wixext.dll"
+            if (-not (Test-Path -LiteralPath $srcDll)) {
+                throw "NuGet package did not contain wixext5\WixToolset.UI.wixext.dll"
+            }
+            New-Item -ItemType Directory -Force -Path (Split-Path $dllPath) | Out-Null
+            Copy-Item -LiteralPath $srcDll -Destination $dllPath -Force
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $dllPath)) {
+        throw "Unable to resolve WixToolset.UI.wixext.dll"
+    }
+    return $dllPath
+}
+
 if (-not $SkipMsi) {
     Write-Host "Building MSI (WiX)..." -ForegroundColor Cyan
     $wixExe = Install-WixCli
     if (Test-Path -LiteralPath $msiPath) { Remove-Item -LiteralPath $msiPath -Force }
 
-    # Cache the UI extension globally so `wix build -ext` can resolve it in CI.
-    $uiExtId = "WixToolset.UI.wixext/5.0.2"
-    Write-Host "Ensuring $uiExtId is installed (global)..." -ForegroundColor Cyan
-    & $wixExe extension add --global $uiExtId
-    if (-not $?) {
-        Write-Host "Retrying UI extension install with --force..." -ForegroundColor Yellow
-        & $wixExe extension add --global $uiExtId --force
-        if (-not $?) {
-            throw "Failed to install $uiExtId."
-        }
-    }
-
-    $wxs = Join-Path $installerDir "ClientCenter.wxs"
-    $bindPath = (Resolve-Path -LiteralPath $PublishDir).Path
-
-    # Prefer an explicit DLL path when present (most reliable for GHA runners).
-    $uiExtDllCandidates = @(
-        (Join-Path $env:USERPROFILE ".wix\extensions\WixToolset.UI.wixext\5.0.2\wixext5\WixToolset.UI.wixext.dll"),
-        (Join-Path $env:USERPROFILE ".wix\extensions\WixToolset.UI.wixext\5.0.2\wixext4\WixToolset.UI.wixext.dll")
-    )
-    $uiExtArg = $uiExtId
-    foreach ($candidate in $uiExtDllCandidates) {
-        if (Test-Path -LiteralPath $candidate) {
-            $uiExtArg = $candidate
-            Write-Host "Using UI extension DLL: $uiExtArg" -ForegroundColor Cyan
-            break
-        }
-    }
-
-    Push-Location $installerDir
+    # Avoid native-command stderr aborting the script on PowerShell 7 / GHA.
+    $prevNativePref = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
     try {
-        & $wixExe build $wxs `
-            -ext $uiExtArg `
-            -bindpath "PublishDir=$bindPath" `
-            -d "Version=$msiVersion" `
-            -arch x64 `
-            -o $msiPath
+        $uiExtDll = Get-WixUiExtensionDll -Version "5.0.2"
+        Write-Host "Using UI extension DLL: $uiExtDll" -ForegroundColor Cyan
+
+        $wxs = Join-Path $installerDir "ClientCenter.wxs"
+        $bindPath = (Resolve-Path -LiteralPath $PublishDir).Path
+
+        Push-Location $installerDir
+        try {
+            & $wixExe build $wxs `
+                -ext $uiExtDll `
+                -bindpath "PublishDir=$bindPath" `
+                -d "Version=$msiVersion" `
+                -arch x64 `
+                -o $msiPath
+            $buildOk = ($LASTEXITCODE -eq 0)
+        }
+        finally {
+            Pop-Location
+        }
     }
     finally {
-        Pop-Location
+        $PSNativeCommandUseErrorActionPreference = $prevNativePref
     }
 
-    if (-not $? -or -not (Test-Path -LiteralPath $msiPath)) {
+    if (-not $buildOk -or -not (Test-Path -LiteralPath $msiPath)) {
         throw "WiX MSI build failed."
     }
     Write-Host "MSI created: $msiPath" -ForegroundColor Green
