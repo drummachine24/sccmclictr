@@ -7,7 +7,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.1.7",
+    [string]$Version = "1.1.8",
     [switch]$SkipZip,
     [switch]$SkipMsi,
     [switch]$SkipExe,
