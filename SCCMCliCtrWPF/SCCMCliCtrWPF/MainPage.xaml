@@ -147,6 +147,10 @@
                                 <RibbonButton Name="btDeleteBoundaryGroupCache" Label="Delete cached BoundaryGroup" SmallImageSource="/SCCMCliCtrWPF;component/Images/Repair.ico" ToolTip="delete the cached BoundaryGroup" Click="btDeleteBoundaryGroupCache_Click"></RibbonButton>
                             </RibbonSplitButton>
                         </RibbonGroup>
+                        <RibbonGroup Header="Intune / MDM" ToolTip="Device-local Intune and MDM actions" SmallImageSource="Images/ComputerPolicy.ico">
+                            <RibbonButton Name="btMdmSync" Label="MDM Sync" ToolTip="Trigger MDM sync via EnterpriseMgmt scheduled tasks on the target" LargeImageSource="/SCCMCliCtrWPF;component/Images/Send%20Receive.ico" SmallImageSource="/SCCMCliCtrWPF;component/Images/Send%20Receive.ico" Click="btMdmSync_Click" />
+                            <RibbonButton Name="btMdmCollectDiag" Label="Collect MDM Diag" ToolTip="Run mdmdiagnosticstool.exe on the target and report the cab path" LargeImageSource="/SCCMCliCtrWPF;component/Images/Heartbeat.ico" SmallImageSource="/SCCMCliCtrWPF;component/Images/Heartbeat.ico" Click="btMdmCollectDiag_Click" />
+                        </RibbonGroup>
                         <RibbonGroup Header="App.Mgmt." ToolTip="Application related actions" SmallImageSource="Images/Pack_close.ico">
                             <RibbonSplitButton Name="btAppMgmt" ToolTip="Application Management" LargeImageSource="Images/Pack_close.ico" SmallImageSource="Images/Pack_close.ico" Label="..." Click="btAppManGlobalEvaluation_Click">
                                 <RibbonButton Name="btAppManUserPolicyAction" Label="Application manager user policy action" SmallImageSource="Images/Pack_close.ico" Click="btAppManUserPolicyAction_Click" />
@@ -168,7 +172,7 @@
                     <Border BorderBrush="Silver" BorderThickness="2" />
                 </DockPanel>
                 <DockPanel Name="MainFunctionsDock" DockPanel.Dock="Bottom" VerticalAlignment="Stretch">
-                    <s:NavigationPane Name="navigationPane1" ItemsButtonsContextMenu="{x:Null}" HorizontalAlignment="Stretch" DockPanel.Dock="Bottom" LargeItems="4" IsSmallItemsVisible="False" IsMinimizeButtonVisible="False" HasSplitter="True" HasResizeThumb="False" IsEnabled="False" CanMinimize="False" IsDefaultConfigureMenuEnabled="False">
+                    <s:NavigationPane Name="navigationPane1" ItemsButtonsContextMenu="{x:Null}" HorizontalAlignment="Stretch" DockPanel.Dock="Bottom" LargeItems="5" IsSmallItemsVisible="False" IsMinimizeButtonVisible="False" HasSplitter="True" HasResizeThumb="False" IsEnabled="False" CanMinimize="False" IsDefaultConfigureMenuEnabled="False">
                         <s:NavigationPaneItem Name="MonitoringPane" Header="Monitoring" Image="/SCCMCliCtrWPF;component/Images/Stocks.ico" IsEnabled="True">
                             <StackPanel VerticalAlignment="Stretch">
                                 <TreeView VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Height="200" Name="tvMonitoring" BorderBrush="#00000000" Foreground="#00000000" Loaded="tvMonitoring_Loaded" Background="#00000000">
@@ -389,6 +393,54 @@
                                 </TreeView>
                             </StackPanel>
                         </s:NavigationPaneItem>
+                        <s:NavigationPaneItem Name="IntuneMdmPane" Header="Intune / MDM" ToolTip="Device-local Intune and MDM diagnostics" Image="/SCCMCliCtrWPF;component/Images/ComputerPolicy.ico" ImageSmall="/SCCMCliCtrWPF;component/Images/ComputerPolicy.ico" IsSelected="False">
+                            <StackPanel VerticalAlignment="Stretch">
+                                <TreeView VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Height="220" Name="tvIntuneMdm" Background="#00000000" BorderBrush="#00000000" Foreground="#00000000" MouseLeftButtonDown="treeView1_MouseLeftButtonDown">
+                                    <TreeViewItem Name="tviIntuneOverview" Header="Overview" FontSize="14" Margin="0,5,0,0" IsSelected="False" OverridesDefaultStyle="False" IsExpanded="True" Selected="TreeViewItem_Selected">
+                                        <TreeViewItem IsExpanded="True" Tag="IntuneEnrollment" Name="tviIntuneEnrollment">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/ComputerPolicy.ico" Stretch="Uniform" Width="20" Height="20"/>
+                                                    <TextBlock Text="Enrollment" Margin="3,0,0,0"/>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
+                                        <TreeViewItem IsExpanded="True" Tag="IntuneCoMgmt" Name="tviIntuneCoMgmt">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/Setting.ico" Stretch="Uniform" Width="20" Height="20"/>
+                                                    <TextBlock Text="Co-management" Margin="3,0,0,0"/>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
+                                        <TreeViewItem IsExpanded="True" Tag="IntuneIME" Name="tviIntuneIME">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/Add-ons%20setup.ico" Stretch="Uniform" Width="20" Height="20"/>
+                                                    <TextBlock Text="IME" Margin="3,0,0,0"/>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
+                                        <TreeViewItem IsExpanded="True" Tag="IntuneMdmLogs" Name="tviIntuneMdmLogs">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/Stocks.ico" Stretch="Uniform" Width="20" Height="20"/>
+                                                    <TextBlock Text="MDM Logs" Margin="3,0,0,0"/>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
+                                        <TreeViewItem IsExpanded="True" Tag="IntunePolicies" Name="tviIntunePolicies">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/UserPolicy.ico" Stretch="Uniform" Width="20" Height="20"/>
+                                                    <TextBlock Text="Policies" Margin="3,0,0,0"/>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
+                                    </TreeViewItem>
+                                </TreeView>
+                            </StackPanel>
+                        </s:NavigationPaneItem>
                     </s:NavigationPane>
                 </DockPanel>
             </DockPanel>
@@ -506,8 +558,33 @@
                                 <my4:PowerSettings x:Name="PwrSettingsPane"/>
                             </Grid>
                         </TabItem>
+                        <TabItem Header="Intune Enrollment" Name="IntuneEnrollmentPanel" Tag="IntuneEnrollment" IsSelected="False">
+                            <Grid>
+                                <my6:IntuneEnrollmentGrid x:Name="IntuneEnrollmentGrid1"/>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="Intune Co-management" Name="IntuneCoMgmtPanel" Tag="IntuneCoMgmt" IsSelected="False">
+                            <Grid>
+                                <my6:IntuneCoMgmtGrid x:Name="IntuneCoMgmtGrid1"/>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="Intune IME" Name="IntuneIMEPanel" Tag="IntuneIME" IsSelected="False">
+                            <Grid>
+                                <my6:IntuneIMEGrid x:Name="IntuneIMEGrid1"/>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="Intune MDM Logs" Name="IntuneMdmLogsPanel" Tag="IntuneMdmLogs" IsSelected="False">
+                            <Grid>
+                                <my6:IntuneMdmLogsGrid x:Name="IntuneMdmLogsGrid1"/>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="Intune Policies" Name="IntunePoliciesPanel" Tag="IntunePolicies" IsSelected="False">
+                            <Grid>
+                                <my6:IntunePoliciesGrid x:Name="IntunePoliciesGrid1"/>
+                            </Grid>
+                        </TabItem>
                         <TabItem/>
-                        
+
                     </TabControl>
                 </DockPanel>
             </DockPanel>
