@@ -103,13 +103,28 @@ if (-not $SkipMsi) {
     $wixExe = Install-WixCli
     if (Test-Path -LiteralPath $msiPath) { Remove-Item -LiteralPath $msiPath -Force }
 
+    # Ensure the standard UI dialog set is available (Finish / completion page).
+    Write-Host "Ensuring WixToolset.UI.wixext is installed..." -ForegroundColor Cyan
+    & $wixExe extension add "WixToolset.UI.wixext/5.0.2"
+    if (-not $?) {
+        # Already present is fine; force-add when add fails for other reasons.
+        & $wixExe extension add "WixToolset.UI.wixext/5.0.2" --force
+    }
+
     $wxs = Join-Path $installerDir "ClientCenter.wxs"
     $bindPath = (Resolve-Path -LiteralPath $PublishDir).Path
-    & $wixExe build $wxs `
-        -bindpath "PublishDir=$bindPath" `
-        -d "Version=$msiVersion" `
-        -arch x64 `
-        -o $msiPath
+    Push-Location $installerDir
+    try {
+        & $wixExe build $wxs `
+            -ext WixToolset.UI.wixext `
+            -bindpath "PublishDir=$bindPath" `
+            -d "Version=$msiVersion" `
+            -arch x64 `
+            -o $msiPath
+    }
+    finally {
+        Pop-Location
+    }
 
     if (-not $? -or -not (Test-Path -LiteralPath $msiPath)) {
         throw "WiX MSI build failed."
