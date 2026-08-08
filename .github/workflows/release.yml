@@ -46,6 +46,8 @@ jobs:
         run: |
           dotnet tool install --global wix --version 5.0.2
           wix --version
+          wix extension add --global WixToolset.UI.wixext/5.0.2
+          wix extension list
 
       - name: Install Inno Setup
         shell: pwsh
