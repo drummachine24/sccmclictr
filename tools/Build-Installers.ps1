@@ -121,10 +121,12 @@ function Get-WixUiExtensionDll {
         New-Item -ItemType Directory -Force -Path $tmp | Out-Null
         try {
             $nupkg = Join-Path $tmp "WixToolset.UI.wixext.$Version.nupkg"
+            $zip = Join-Path $tmp "WixToolset.UI.wixext.$Version.zip"
             $url = "https://api.nuget.org/v3-flatcontainer/wixtoolset.ui.wixext/$Version/wixtoolset.ui.wixext.$Version.nupkg"
             Invoke-WebRequest -Uri $url -OutFile $nupkg -UseBasicParsing
+            Copy-Item -LiteralPath $nupkg -Destination $zip -Force
             $extract = Join-Path $tmp "extract"
-            Expand-Archive -LiteralPath $nupkg -DestinationPath $extract -Force
+            Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
             $srcDll = Join-Path $extract "wixext5\WixToolset.UI.wixext.dll"
             if (-not (Test-Path -LiteralPath $srcDll)) {
                 throw "NuGet package did not contain wixext5\WixToolset.UI.wixext.dll"
