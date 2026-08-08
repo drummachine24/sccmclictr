@@ -2,7 +2,7 @@
 <!--
   Client Center for Configuration Manager - WiX v5 package definition.
   Built by tools/Build-Installers.ps1 via:
-    wix build ClientCenter.wxs -bindpath PublishDir=... -d Version=1.1.6.0 -o ...
+    wix build ClientCenter.wxs -bindpath PublishDir=... -d Version=1.1.7.0 -o ...
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package
