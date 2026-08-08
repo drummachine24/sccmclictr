@@ -602,6 +602,11 @@ namespace ClientCenter
                     SettingsMgmtGrid.Listener = myTrace;
                     SWDistSummaryGrid1.Listener = myTrace;
                     LogViewPane.Listener = myTrace;
+                    IntuneEnrollmentGrid1.Listener = myTrace;
+                    IntuneCoMgmtGrid1.Listener = myTrace;
+                    IntuneIMEGrid1.Listener = myTrace;
+                    IntuneMdmLogsGrid1.Listener = myTrace;
+                    IntunePoliciesGrid1.Listener = myTrace;
 
                     navigationPane1.IsEnabled = true;
                     ribAgentActions.IsEnabled = true;
@@ -715,6 +720,21 @@ namespace ClientCenter
                                         break;
                                     case "LogMonitoring":
                                         LogViewPane.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "IntuneEnrollment":
+                                        IntuneEnrollmentGrid1.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "IntuneCoMgmt":
+                                        IntuneCoMgmtGrid1.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "IntuneIME":
+                                        IntuneIMEGrid1.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "IntuneMdmLogs":
+                                        IntuneMdmLogsGrid1.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "IntunePolicies":
+                                        IntunePoliciesGrid1.SCCMAgentConnection = oAgent;
                                         break;
 
                                 }
@@ -1279,6 +1299,48 @@ namespace ClientCenter
                 bt_Connect_Click(sender, new RoutedEventArgs());
                 e.Handled = true;
             }
+        }
+
+        private void btMdmSync_Click(object sender, RoutedEventArgs e)
+        {
+            if (oAgent == null || !oAgent.isConnected)
+                return;
+            Mouse.OverrideCursor = Cursors.Wait;
+            try
+            {
+                string result = ClientCenter.Controls.IntuneMdmHelper.RunAction(oAgent, ClientCenter.Controls.IntuneMdmScripts.Sync);
+                if (myTrace != null)
+                    myTrace.WriteLine(result);
+                else
+                    rStatus.AppendText(result + "\n");
+            }
+            catch (Exception ex)
+            {
+                if (myTrace != null)
+                    myTrace.WriteLine("MDM Sync error: " + ex.Message);
+            }
+            Mouse.OverrideCursor = Cursors.Arrow;
+        }
+
+        private void btMdmCollectDiag_Click(object sender, RoutedEventArgs e)
+        {
+            if (oAgent == null || !oAgent.isConnected)
+                return;
+            Mouse.OverrideCursor = Cursors.Wait;
+            try
+            {
+                string result = ClientCenter.Controls.IntuneMdmHelper.RunAction(oAgent, ClientCenter.Controls.IntuneMdmScripts.CollectDiag);
+                if (myTrace != null)
+                    myTrace.WriteLine(result);
+                else
+                    rStatus.AppendText(result + "\n");
+            }
+            catch (Exception ex)
+            {
+                if (myTrace != null)
+                    myTrace.WriteLine("Collect MDM Diag error: " + ex.Message);
+            }
+            Mouse.OverrideCursor = Cursors.Arrow;
         }
     }
 
