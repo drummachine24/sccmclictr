@@ -10,6 +10,7 @@
     <Nullable>disable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
+    <ApplicationIcon>Icon16.ico</ApplicationIcon>
     <LangVersion>latest</LangVersion>
     <Version>1.1.8</Version>
     <NoWarn>$(NoWarn);CA1416;SYSLIB0014</NoWarn>

@@ -187,13 +187,14 @@ $startMenu = [Environment]::GetFolderPath("Programs")
 $shortcutDir = Join-Path $startMenu "Client Center for Configuration Manager"
 New-Item -ItemType Directory -Path $shortcutDir -Force | Out-Null
 
-$shortcut = $shell.CreateShortcut((Join-Path $shortcutDir "Client Center.lnk"))
+$shortcut = $shell.CreateShortcut((Join-Path $shortcutDir "Client Center for Configuration Manager.lnk"))
 $shortcut.TargetPath = $installedExe
 $shortcut.WorkingDirectory = $InstallDir
 $shortcut.Description = "Client Center for Configuration Manager v$productVersion"
+$shortcut.IconLocation = "$installedExe,0"
 $shortcut.Save()
 
-$uninstallShortcut = $shell.CreateShortcut((Join-Path $shortcutDir "Uninstall Client Center.lnk"))
+$uninstallShortcut = $shell.CreateShortcut((Join-Path $shortcutDir "Uninstall Client Center for Configuration Manager.lnk"))
 $uninstallShortcut.TargetPath = "powershell.exe"
 $uninstallShortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $InstallDir 'Uninstall-ClientCenter.ps1')`""
 $uninstallShortcut.WorkingDirectory = $InstallDir
@@ -201,11 +202,22 @@ $uninstallShortcut.Description = "Uninstall Client Center for Configuration Mana
 $uninstallShortcut.Save()
 
 $desktop = [Environment]::GetFolderPath("Desktop")
-$desktopShortcut = $shell.CreateShortcut((Join-Path $desktop "Client Center.lnk"))
+$desktopShortcut = $shell.CreateShortcut((Join-Path $desktop "Client Center for Configuration Manager.lnk"))
 $desktopShortcut.TargetPath = $installedExe
 $desktopShortcut.WorkingDirectory = $InstallDir
 $desktopShortcut.Description = "Client Center for Configuration Manager v$productVersion"
+$desktopShortcut.IconLocation = "$installedExe,0"
 $desktopShortcut.Save()
+
+# Remove legacy short-name shortcuts from older installs.
+$legacyStartMenu = Join-Path $shortcutDir "Client Center.lnk"
+$legacyUninstall = Join-Path $shortcutDir "Uninstall Client Center.lnk"
+$legacyDesktop = Join-Path $desktop "Client Center.lnk"
+foreach ($legacy in @($legacyStartMenu, $legacyUninstall, $legacyDesktop)) {
+    if (Test-Path -LiteralPath $legacy) {
+        Remove-Item -LiteralPath $legacy -Force -ErrorAction SilentlyContinue
+    }
+}
 
 $uninstallRegPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ClientCenterForConfigMgr"
 New-Item -Path $uninstallRegPath -Force | Out-Null

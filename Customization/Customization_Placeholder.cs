@@ -2,7 +2,7 @@
 {
     public class Customization
     {
-        public static string Title = "Client Center for ConfigMgr (OpenSource Version)";
+        public static string Title = "Client Center for Configuration Manager";
 
         public static bool CheckLicense() { return true; }
 

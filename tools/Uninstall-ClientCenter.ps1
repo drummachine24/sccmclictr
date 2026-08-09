@@ -72,8 +72,13 @@ $shortcutDir = Join-Path $startMenu "Client Center for Configuration Manager"
 $desktop = [Environment]::GetFolderPath("Desktop")
 
 if (Test-Path $shortcutDir) { Remove-Item $shortcutDir -Recurse -Force -ErrorAction SilentlyContinue }
-$desktopShortcut = Join-Path $desktop "Client Center.lnk"
-if (Test-Path $desktopShortcut) { Remove-Item $desktopShortcut -Force -ErrorAction SilentlyContinue }
+foreach ($desktopName in @(
+        "Client Center for Configuration Manager.lnk",
+        "Client Center.lnk"
+    )) {
+    $desktopShortcut = Join-Path $desktop $desktopName
+    if (Test-Path $desktopShortcut) { Remove-Item $desktopShortcut -Force -ErrorAction SilentlyContinue }
+}
 
 if (Test-Path $InstallDir) {
     Write-Host "Removing installation files..." -ForegroundColor Cyan

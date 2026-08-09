@@ -36,7 +36,7 @@ DisableProgramGroupPage=yes
 LicenseFile=
 OutputDir={#OutputDir}
 OutputBaseFilename=ClientCenter-v{#MyAppVersion}-win-x64-setup
-SetupIconFile=
+SetupIconFile=..\..\SCCMCliCtrWPF\SCCMCliCtrWPF\Icon16.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -66,9 +66,9 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
   Excludes: "Install.cmd,Install-ClientCenter.ps1,Uninstall.cmd,Uninstall-ClientCenter.ps1"
 
 [Icons]
-Name: "{group}\Client Center"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
-Name: "{group}\Uninstall Client Center"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Client Center"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

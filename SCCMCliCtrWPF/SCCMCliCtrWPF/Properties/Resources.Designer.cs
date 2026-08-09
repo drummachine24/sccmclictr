@@ -71,7 +71,7 @@ namespace ClientCenter.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to &lt;ActionDescription Class=&quot;Executable&quot; SelectionMode=&quot;Both&quot; DisplayName=&quot;Client Center&quot; MnemonicDisplayName=&quot;Client Center...&quot; Description=&quot;Open Client Center...&quot;&gt;
+        ///   Looks up a localized string similar to &lt;ActionDescription Class=&quot;Executable&quot; SelectionMode=&quot;Both&quot; DisplayName=&quot;Client Center for Configuration Manager&quot; MnemonicDisplayName=&quot;Client Center for Configuration Manager...&quot; Description=&quot;Open Client Center for Configuration Manager...&quot;&gt;
         ///	&lt;ShowOn&gt;
         ///		&lt;string&gt;ContextMenu&lt;/string&gt;
         ///	&lt;/ShowOn&gt;
