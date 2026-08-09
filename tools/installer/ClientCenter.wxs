@@ -20,7 +20,7 @@
         Manufacturer="drummachine24" />
 
     <MajorUpgrade
-        DowngradeErrorMessage="A newer version of Client Center is already installed. Please uninstall it first if you need to install an older version."
+        DowngradeErrorMessage="A newer version of Client Center for Configuration Manager is already installed. Please uninstall it first if you need to install an older version."
         Schedule="afterInstallInitialize" />
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
@@ -29,9 +29,11 @@
          Silent installs (/qn, /quiet) still skip UI as expected. -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Client Center was installed successfully." />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Client Center for Configuration Manager was installed successfully." />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+    <Icon Id="ProductIcon" SourceFile="..\..\SCCMCliCtrWPF\SCCMCliCtrWPF\Icon16.ico" />
 
-    <Feature Id="ProductFeature" Title="Client Center" Level="1">
+    <Feature Id="ProductFeature" Title="Client Center for Configuration Manager" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="ApplicationShortcut" />
     </Feature>
@@ -57,10 +59,11 @@
     <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="B1C2D3E4-F5A6-4789-8ABC-DEF012345678">
       <Shortcut
           Id="StartMenuShortcut"
-          Name="Client Center"
+          Name="Client Center for Configuration Manager"
           Description="Client Center for Configuration Manager"
           Target="[INSTALLFOLDER]SCCMCliCtrWPF.exe"
-          WorkingDirectory="INSTALLFOLDER" />
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="ProductIcon" />
       <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       <RegistryValue
           Root="HKLM"

@@ -7,11 +7,11 @@ using System.Windows;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("SCCMCliCtr")]
-[assembly: AssemblyDescription("Client Center for Configurtaion Manager")]
+[assembly: AssemblyTitle("Client Center for Configuration Manager")]
+[assembly: AssemblyDescription("Client Center for Configuration Manager")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Zander - Tools")]
-[assembly: AssemblyProduct("SCCMCliCtr")]
+[assembly: AssemblyProduct("Client Center for Configuration Manager")]
 [assembly: AssemblyCopyright("Copyright ©  2022 by Roger Zander")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

@@ -6,7 +6,8 @@
       xmlns:rib="http://schemas.microsoft.com/winfx/2006/xaml/presentation/ribbon"
       mc:Ignorable="d"
       xmlns:p="clr-namespace:ClientCenter.Properties" 
-      d:DesignHeight="500" d:DesignWidth="800" Title="Client Center for Configuration Manager" 
+      d:DesignHeight="500" d:DesignWidth="800" Title="Client Center for Configuration Manager"
+      Icon="Images/Icon16.ico" 
       xmlns:my="clr-namespace:Microsoft.Windows.Themes;assembly=PresentationFramework.Aero" 
       xmlns:my3="http://schemas.microsoft.com/wpf/2008/toolkit" xmlns:my4="clr-namespace:ClientCenter" 
       xmlns:my6="clr-namespace:ClientCenter.Controls">
