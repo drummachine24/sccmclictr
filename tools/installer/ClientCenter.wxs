@@ -50,7 +50,8 @@
       <Directory Id="ApplicationProgramsFolder" Name="Client Center for Configuration Manager" />
     </StandardDirectory>
 
-    <StandardDirectory Id="CommonDesktopFolder" />
+    <!-- Per-machine packages resolve DesktopFolder to the common/public desktop. -->
+    <StandardDirectory Id="DesktopFolder" />
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <!-- Harvest publish output; exclude portable PowerShell install helpers (ZIP-only). -->
@@ -80,7 +81,7 @@
           KeyPath="yes" />
     </Component>
 
-    <Component Id="DesktopShortcut" Directory="CommonDesktopFolder" Guid="C2D3E4F5-A6B7-4890-9BCD-EF0123456789" Condition="DESKTOPSHORTCUT">
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="C2D3E4F5-A6B7-4890-9BCD-EF0123456789" Condition="DESKTOPSHORTCUT">
       <Shortcut
           Id="DesktopShortcutLink"
           Name="Client Center for Configuration Manager"
