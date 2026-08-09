@@ -26,7 +26,7 @@ dotnet build SCCMCliCtrWPF/SCCMCliCtrWPF.sln -c Release
 Release packaging on Windows (ZIP + MSI + Setup.exe):
 
 ```powershell
-.\tools\Build-Release.ps1 -Version 1.1.9
+.\tools\Build-Release.ps1 -Version 1.1.10
 ```
 
 Requires [WiX Toolset](https://wixtoolset.org/) CLI (`dotnet tool install -g wix`) and [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the MSI/EXE outputs.
