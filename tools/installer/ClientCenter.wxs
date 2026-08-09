@@ -2,7 +2,7 @@
 <!--
   Client Center for Configuration Manager - WiX v5 package definition.
   Built by tools/Build-Installers.ps1 via:
-    wix build ClientCenter.wxs -ext WixToolset.UI.wixext -bindpath PublishDir=... -d Version=1.1.9.0 -o ...
+    wix build ClientCenter.wxs ClientCenterUI.wxs -ext WixToolset.UI.wixext -bindpath PublishDir=... -d Version=1.1.9.0 -o ...
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
@@ -25,17 +25,21 @@
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <!-- Standard wizard UI: license/welcome -> progress -> completion (Finish).
-         Silent installs (/qn, /quiet) still skip UI as expected. -->
-    <ui:WixUI Id="WixUI_Minimal" />
+    <!-- Destination folder + optional Start Menu / Desktop shortcuts. -->
+    <ui:WixUI Id="ClientCenter_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Client Center for Configuration Manager was installed successfully." />
     <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
     <Icon Id="ProductIcon" SourceFile="..\..\SCCMCliCtrWPF\SCCMCliCtrWPF\Icon16.ico" />
 
-    <Feature Id="ProductFeature" Title="Client Center for Configuration Manager" Level="1">
+    <!-- Checked by default (Start Menu). Desktop opt-in matches Setup.exe. -->
+    <Property Id="STARTMENUSHORTCUT" Value="1" Secure="yes" />
+    <Property Id="DESKTOPSHORTCUT" Secure="yes" />
+
+    <Feature Id="ProductFeature" Title="Client Center for Configuration Manager" Level="1" ConfigurableDirectory="INSTALLFOLDER">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -45,6 +49,8 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="Client Center for Configuration Manager" />
     </StandardDirectory>
+
+    <StandardDirectory Id="CommonDesktopFolder" />
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <!-- Harvest publish output; exclude portable PowerShell install helpers (ZIP-only). -->
@@ -56,7 +62,7 @@
       </Files>
     </ComponentGroup>
 
-    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="B1C2D3E4-F5A6-4789-8ABC-DEF012345678">
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="B1C2D3E4-F5A6-4789-8ABC-DEF012345678" Condition="STARTMENUSHORTCUT">
       <Shortcut
           Id="StartMenuShortcut"
           Name="Client Center for Configuration Manager"
@@ -69,6 +75,23 @@
           Root="HKLM"
           Key="Software\drummachine24\ClientCenter"
           Name="StartMenuShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="CommonDesktopFolder" Guid="C2D3E4F5-A6B7-4890-9BCD-EF0123456789" Condition="DESKTOPSHORTCUT">
+      <Shortcut
+          Id="DesktopShortcutLink"
+          Name="Client Center for Configuration Manager"
+          Description="Client Center for Configuration Manager"
+          Target="[INSTALLFOLDER]SCCMCliCtrWPF.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="ProductIcon" />
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\drummachine24\ClientCenter"
+          Name="DesktopShortcut"
           Type="integer"
           Value="1"
           KeyPath="yes" />
