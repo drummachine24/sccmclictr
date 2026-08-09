@@ -158,11 +158,12 @@ if (-not $SkipMsi) {
         Write-Host "Using UI extension DLL: $uiExtDll" -ForegroundColor Cyan
 
         $wxs = Join-Path $installerDir "ClientCenter.wxs"
+        $wxsUi = Join-Path $installerDir "ClientCenterUI.wxs"
         $bindPath = (Resolve-Path -LiteralPath $PublishDir).Path
 
         Push-Location $installerDir
         try {
-            & $wixExe build $wxs `
+            & $wixExe build $wxs $wxsUi `
                 -ext $uiExtDll `
                 -bindpath "PublishDir=$bindPath" `
                 -d "Version=$msiVersion" `
