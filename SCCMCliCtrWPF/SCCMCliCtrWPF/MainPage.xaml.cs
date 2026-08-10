@@ -35,6 +35,9 @@ namespace ClientCenter
             Application.Current.DispatcherUnhandledException += Current_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
+            AppLogger.Initialize();
+            AppLogger.Info("MainPage constructing");
+
             InitializeComponent();
 
             ribbon1.ContextMenu = null;
@@ -57,6 +60,7 @@ namespace ClientCenter
                 rStatus.AppendText(".NET 10 and CIM/PowerShell modernization (2026) by Josh (drummachine24)\n");
                 rStatus.AppendText("Current Version: " + FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion.ToString() + "\n");
                 rStatus.AppendText("Assembly Version: " + Assembly.GetExecutingAssembly().GetName().Version.ToString() + "\n");
+                rStatus.AppendText("Log file: " + AppLogger.LogPath + "\n");
 
                 if (!SCCMCliCtr.Customization.CheckLicense() | SCCMCliCtr.Customization.isOpenSource)
                 {
@@ -384,8 +388,15 @@ namespace ClientCenter
                 this.myAbout.MSG = false;
             }
 
-            eventMonitoring1.bt_StopMonitoring_Click(this, null);
-            eventMonitoring1.treeView1.Items.Clear();
+            try
+            {
+                eventMonitoring1.bt_StopMonitoring_Click(this, null);
+                eventMonitoring1.treeView1.Items.Clear();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("PageReset: stop event monitoring", ex);
+            }
 
             AgentSettingsPane.IsSelected = true;
             tviAgentSettings.IsSelected = true;
@@ -481,57 +492,114 @@ namespace ClientCenter
 
         void Current_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
-            e.ToString();
+            AppLogger.Error("MainPage dispatcher unhandled exception", e.Exception);
+            try
+            {
+                if (myTrace != null)
+                    myTrace.WriteError("Unhandled error: " + e.Exception.Message);
+            }
+            catch { }
+            e.Handled = true;
         }
 
         static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            e.ToString();
+            var ex = e.ExceptionObject as Exception;
+            if (ex != null)
+                AppLogger.Error("MainPage domain unhandled exception (IsTerminating=" + e.IsTerminating + ")", ex);
+            else
+                AppLogger.Error("MainPage domain unhandled exception: " + e.ExceptionObject);
         }
 
         void Current_Exit(object sender, ExitEventArgs e)
         {
+            AppLogger.Info("MainPage Current_Exit");
             try
             {
                 if (oAgent != null)
                     oAgent.Client.Monitoring.AsynchronousScript.Close();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Exit: close AsynchronousScript", ex);
+            }
             try
             {
                 if (oAgent != null && oAgent.isConnected)
                     oAgent.disconnect();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Exit: disconnect", ex);
+            }
         }
 
         private void bt_Connect_Click(object sender, RoutedEventArgs e)
         {
             lastTryConnect = DateTime.MaxValue;
-            sender.ToString();
             AnonymousDelegate dUpdate = delegate ()
             {
                 Mouse.OverrideCursor = Cursors.Wait;
+                AppLogger.Info("Connect clicked");
 
                 if (oAgent != null)
                 {
+                    AppLogger.Info("Closing previous connection to " + (oAgent.TargetHostname ?? "(unknown)"));
                     this.AgentSettingsPanel.IsSelected = true;
 
                     if (oAgent.isConnected)
                     {
                         try
                         {
-                            eventMonitoring1.bt_StopMonitoring_Click(sender, e);
+                            try
+                            {
+                                eventMonitoring1.bt_StopMonitoring_Click(sender, e);
+                            }
+                            catch (Exception exStop)
+                            {
+                                AppLogger.Error("Stop event monitoring during reconnect", exStop);
+                            }
 
-                            oAgent.Client.Monitoring.AsynchronousScript.Close();
-                            oAgent.disconnect();
+                            try
+                            {
+                                if (oAgent.Client != null && oAgent.Client.Monitoring != null && oAgent.Client.Monitoring.AsynchronousScript != null)
+                                    oAgent.Client.Monitoring.AsynchronousScript.Close();
+                            }
+                            catch (Exception exClose)
+                            {
+                                AppLogger.Error("Close AsynchronousScript during reconnect", exClose);
+                            }
+
+                            try
+                            {
+                                oAgent.disconnect();
+                                AppLogger.Info("Previous agent disconnected");
+                            }
+                            catch (Exception exDisc)
+                            {
+                                AppLogger.Error("disconnect() during reconnect", exDisc);
+                            }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("Unexpected error while closing previous connection", ex);
+                        }
                     }
 
-                    oAgent.Dispose();
-                    PageReset();
+                    try
+                    {
+                        oAgent.Dispose();
+                        AppLogger.Info("Previous agent disposed");
+                    }
+                    catch (Exception exDisp)
+                    {
+                        AppLogger.Error("Dispose previous agent", exDisp);
+                    }
 
+                    oAgent = null;
+                    Common.Agent = null;
+                    ClearClientInfoSummaryBar();
+                    PageReset();
                 }
 
                 tb_TargetComputer.Text = tb_TargetComputer.Text.Trim();
@@ -546,6 +614,7 @@ namespace ClientCenter
 
                     tb_TargetComputer.Text = sTarget;
                     tb_TargetComputer2.Text = sTarget;
+                    AppLogger.Info("Connecting to target: " + sTarget);
 
                     if (sTarget.ToLower() == "localhost" | sTarget == "127.0.0.1")
                     {
@@ -588,7 +657,9 @@ namespace ClientCenter
                     }
 
                     oAgent.PSCode.Listeners.Add(myTrace);
+                    AppLogger.Info("Calling oAgent.connect()...");
                     oAgent.connect();
+                    AppLogger.Info("Connected to " + sTarget);
 
                     //Store Agent settings in Common class for Plugin access.
                     Common.Agent = oAgent;
@@ -615,13 +686,18 @@ namespace ClientCenter
 
                         Properties.Settings.Default.Save();
                     }
-                    catch { }
+                    catch (Exception exSettings)
+                    {
+                        AppLogger.Error("Saving connection settings", exSettings);
+                    }
 
+                    AppLogger.Info("Loading Agent Settings / Client Information panes...");
                     agentSettingItem1.Listener = myTrace;
                     agentSettingItem1.SCCMAgentConnection = oAgent;
                     clientInformationGrid1.Listener = myTrace;
                     clientInformationGrid1.SCCMAgentConnection = oAgent;
                     UpdateClientInfoSummaryBar();
+                    AppLogger.Info("Agent Settings / Client Information loaded");
                     cacheGrid1.Listener = myTrace;
                     servicesGrid1.Listener = myTrace;
                     processGrid1.Listener = myTrace;
@@ -655,17 +731,22 @@ namespace ClientCenter
                     clientInformationGrid1.IsEnabled = true;
 
                     this.Title = sTarget;
+                    AppLogger.Info("Connect UI ready for " + sTarget);
 
                 }
                 catch (Exception ex)
                 {
+                    AppLogger.Error("Connect failed for " + sTarget, ex);
                     //ribbon1.IsEnabled = false;
                     navigationPane1.IsEnabled = false;
                     agentSettingItem1.IsEnabled = false;
                     clientInformationGrid1.IsEnabled = false;
                     ClearClientInfoSummaryBar();
-                    myTrace.WriteError("Unable to connect: " + sTarget);
-                    myTrace.WriteError("Error: " + ex.Message);
+                    if (myTrace != null)
+                    {
+                        myTrace.WriteError("Unable to connect: " + sTarget);
+                        myTrace.WriteError("Error: " + ex.Message);
+                    }
                     ribAgentActions.IsEnabled = false;
                     ConnectionDock.Visibility = System.Windows.Visibility.Visible;
                     bt_Ping.Visibility = System.Windows.Visibility.Visible;
@@ -1415,8 +1496,10 @@ namespace ClientCenter
                 return;
             }
 
-            this.builder.Append(message.Replace("PSCode Information: 0 :", ""));
-            oROutTB.AppendText(message.Replace("PSCode Information: 0 :", ""));
+            string clean = message.Replace("PSCode Information: 0 :", "");
+            this.builder.Append(clean);
+            try { AppLogger.Info(clean.TrimEnd()); } catch { }
+            oROutTB.AppendText(clean);
 
             this.OnPropertyChanged(new PropertyChangedEventArgs("Trace"));
         }
@@ -1429,10 +1512,12 @@ namespace ClientCenter
                 return;
             }
 
-            this.builder.AppendLine(message.Replace("PSCode Information: 0 :", "") + "\r\n");
+            string clean = message.Replace("PSCode Information: 0 :", "");
+            this.builder.AppendLine(clean + "\r\n");
+            try { AppLogger.Info(clean); } catch { }
 
             TextRange tr = new TextRange(oROutTB.Document.ContentEnd, oROutTB.Document.ContentEnd);
-            tr.Text = message.Replace("PSCode Information: 0 :", "") + "\r\n";
+            tr.Text = clean + "\r\n";
             tr.ApplyPropertyValue(TextElement.ForegroundProperty, Brushes.Black);
             tr.ApplyPropertyValue(TextElement.FontWeightProperty, FontWeights.Normal);
 
@@ -1442,10 +1527,12 @@ namespace ClientCenter
         public void WriteError(string message)
         {
             //message = message + "\r\n";
-            this.builder.AppendLine(message.Replace("PSCode Information: 0 :", "").Replace("#ERROR:", "") + "\r\n");
+            string clean = message.Replace("PSCode Information: 0 :", "").Replace("#ERROR:", "");
+            this.builder.AppendLine(clean + "\r\n");
+            try { AppLogger.Error(clean); } catch { }
 
             TextRange tr = new TextRange(oROutTB.Document.ContentEnd, oROutTB.Document.ContentEnd);
-            tr.Text = message.Replace("PSCode Information: 0 :", "").Replace("#ERROR:", "") + "\r\n";
+            tr.Text = clean + "\r\n";
             tr.ApplyPropertyValue(TextElement.ForegroundProperty, Brushes.Red);
             tr.ApplyPropertyValue(TextElement.FontWeightProperty, FontWeights.Bold);
 

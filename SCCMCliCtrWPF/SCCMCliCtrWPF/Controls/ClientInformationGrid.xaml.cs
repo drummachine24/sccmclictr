@@ -26,16 +26,25 @@ namespace ClientCenter.Controls
             get { return oAgent; }
             set
             {
-                if (value != null && value.isConnected)
+                if (value == null)
+                {
+                    oAgent = null;
+                    return;
+                }
+
+                if (value.isConnected)
                 {
                     Mouse.OverrideCursor = Cursors.Wait;
                     try
                     {
                         oAgent = value;
+                        AppLogger.Info("Loading client information for " + (oAgent.TargetHostname ?? ""));
                         LoadClientInformation();
+                        AppLogger.Info("Client information load complete");
                     }
                     catch (Exception ex)
                     {
+                        AppLogger.Error("ClientInformationGrid.SCCMAgentConnection", ex);
                         if (Listener != null)
                             Listener.WriteError(ex.Message);
                     }
