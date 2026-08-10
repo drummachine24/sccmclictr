@@ -29,6 +29,13 @@
                 </Button>
                 <Button Name="bt_Connect2"  Content="Connect" VerticalAlignment="Center" Height="25" Width="60" Margin="20,0,0,0" HorizontalAlignment="Left" Click="bt_Connect_Click" ToolTip="connect the computer over WinRM" />
             </DockPanel>
+            <DockPanel Name="ClientInfoDock" DockPanel.Dock="Top" Height="28" Visibility="Collapsed">
+                <DockPanel.Background>
+                    <SolidColorBrush Color="#FFF3F6FB"/>
+                </DockPanel.Background>
+                <TextBlock Name="tbClientInfoSummary" Margin="15,0,15,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           FontSize="12" Foreground="#FF333333" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+            </DockPanel>
             <DockPanel Name="RibbonDock" DockPanel.Dock="Top" Height="120">
                 <Border BorderBrush="Silver" BorderThickness="0" />
                 <Ribbon HorizontalAlignment="Stretch" Name="ribbon1" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" ToolTip="Tip" Height="153" Grid.ColumnSpan="4" IsEnabled="True" ShowQuickAccessToolBarOnTop="False">

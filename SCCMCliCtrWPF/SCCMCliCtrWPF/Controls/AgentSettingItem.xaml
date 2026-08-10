@@ -8,6 +8,50 @@
     <Grid>
         <ScrollViewer Grid.Row="1" Name="ScrollViewer1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" CanContentScroll="True">
             <StackPanel Name="spAgentSettings" HorizontalAlignment="Stretch" IsEnabled="false">
+                <StackPanel Name="spClientInfo" Margin="0,4,0,10">
+                    <StackPanel Orientation="Horizontal" Height="28" Margin="0,0,0,4">
+                        <Label Content="Client Information" FontWeight="Bold" FontSize="13" Padding="4,2,0,0" VerticalAlignment="Center"/>
+                        <ToolBarPanel Height="24" Margin="8,0,0,0" VerticalAlignment="Center">
+                            <ToolBar>
+                                <Image Name="imgReloadClientInfo" Source="/SCCMCliCtrWPF;component/Images/shell32.dll_I0017_0409.ico" Stretch="Uniform" Width="20" Height="20"
+                                       MouseLeftButtonDown="imgReloadClientInfo_MouseLeftButtonDown" ToolTip="Reload client information from the target."/>
+                            </ToolBar>
+                        </ToolBarPanel>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="Operating System:" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"/>
+                        <TextBox Name="tbOSCaption" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"/>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="OS Version / Build:" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"/>
+                        <TextBox Name="tbOSVersionBuild" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"/>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="IP Address:" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"/>
+                        <TextBox Name="tbIPAddress" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"/>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="Site:" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"/>
+                        <TextBox Name="tbClientSite" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"/>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="Boundary Group(s):" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"
+                               ToolTip="Boundary group IDs from the client BoundaryGroupCache. Names require site-server lookup."/>
+                        <TextBox Name="tbBoundaryGroups" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"
+                                 ToolTip="Boundary group IDs cached on the client."/>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="Primary User:" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"/>
+                        <TextBox Name="tbPrimaryUser" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"/>
+                    </StackPanel>
+                    <StackPanel Height="28" Orientation="Horizontal">
+                        <Label Content="Last Checked In:" Width="200" Margin="2,0,10,0" HorizontalContentAlignment="Right"
+                               ToolTip="Last heartbeat / DDR schedule trigger on the client."/>
+                        <TextBox Name="tbLastCheckedIn" Width="420" IsReadOnly="True" IsReadOnlyCaretVisible="True" Background="#FFF4F4F4"/>
+                    </StackPanel>
+                    <Separator Margin="10,8,10,4"/>
+                    <Label Content="Agent Settings" FontWeight="Bold" FontSize="13" Padding="4,2,0,6"/>
+                </StackPanel>
                 <StackPanel Height="32" HorizontalAlignment="Left" Name="stackPanel1" VerticalAlignment="Top" Orientation="Horizontal">
                     <Label Content="Site Code:" Height="28" Name="lSiteCode" Width="200" Margin="2,0,10,0" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" HorizontalContentAlignment="Right" />
                     <TextBox Height="23" Name="tbSiteCode" Width="250" Margin="0,0,10,0" MaxLines="1" MaxLength="3" ToolTip="3Digit Site Code" />

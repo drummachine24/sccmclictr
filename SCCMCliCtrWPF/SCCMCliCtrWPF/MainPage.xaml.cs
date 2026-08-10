@@ -39,6 +39,8 @@ namespace ClientCenter
 
             ribbon1.ContextMenu = null;
 
+            agentSettingItem1.ClientInfoChanged += UpdateClientInfoSummaryBar;
+
             //Disbale SSL/TLS Errors
             System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
             //Disable CRL Check
@@ -388,6 +390,37 @@ namespace ClientCenter
             AgentSettingsPane.IsSelected = true;
             tviAgentSettings.IsSelected = true;
 
+            ClearClientInfoSummaryBar();
+        }
+
+        void UpdateClientInfoSummaryBar()
+        {
+            try
+            {
+                string summary = agentSettingItem1 != null ? agentSettingItem1.ClientInfoSummary : "";
+                if (string.IsNullOrWhiteSpace(summary))
+                {
+                    ClearClientInfoSummaryBar();
+                    return;
+                }
+
+                tbClientInfoSummary.Text = summary;
+                ClientInfoDock.Visibility = Visibility.Visible;
+            }
+            catch
+            {
+                ClearClientInfoSummaryBar();
+            }
+        }
+
+        void ClearClientInfoSummaryBar()
+        {
+            try
+            {
+                tbClientInfoSummary.Text = "";
+                ClientInfoDock.Visibility = Visibility.Collapsed;
+            }
+            catch { }
         }
 
 
@@ -584,8 +617,9 @@ namespace ClientCenter
                     }
                     catch { }
 
-                    agentSettingItem1.SCCMAgentConnection = oAgent;
                     agentSettingItem1.Listener = myTrace;
+                    agentSettingItem1.SCCMAgentConnection = oAgent;
+                    UpdateClientInfoSummaryBar();
                     cacheGrid1.Listener = myTrace;
                     servicesGrid1.Listener = myTrace;
                     processGrid1.Listener = myTrace;

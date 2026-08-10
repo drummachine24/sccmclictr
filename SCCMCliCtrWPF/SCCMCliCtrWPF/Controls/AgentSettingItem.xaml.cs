@@ -1,18 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
-using System.Diagnostics;
+using ClientCenter.Controls;
 using sccmclictr.automation;
 
 namespace ClientCenter
@@ -26,10 +18,16 @@ namespace ClientCenter
 
         public MyTraceListener Listener;
 
+        /// <summary>
+        /// Compact one-line client summary for the main connection bar.
+        /// </summary>
+        public string ClientInfoSummary { get; private set; } = "";
+
+        public event Action ClientInfoChanged;
+
         public AgentSettingItem()
         {
             InitializeComponent();
-
         }
 
         public SCCMAgent SCCMAgentConnection
@@ -53,72 +51,202 @@ namespace ClientCenter
                             spHTTPPort.IsEnabled = true;
                             spHTTPSPort.IsEnabled = true;
 
-                            tbAgentVersion.Text = "";
-                            tbCachePath.Text = "";
-                            tbDNSSuffix.Text = "";
-                            tbGUID.Text = "";
-                            tbInetMP.Text = "";
-                            tbLogPath.Text = "";
-                            tbMP.Text = "";
-                            tbProxyMP.Text = "";
-                            tbSiteCode.Text = "";
-                            tbSetupPath.Text = "";
-                            tbSLP.Text = "";
-                            tbHTTPPort.Text = "";
-                            tbHTTPSPort.Text = "";
-                            cbAutoSite.IsChecked = false;
-
-                            imgSiteCode_MouseLeftButtonDown(this, null);
-                            imgAgentVersion_MouseLeftButtonDown(this, null);
-                            imgMP_MouseLeftButtonDown(this, null);
+                            ClearFields();
+                            LoadClientInformation();
+                            LoadAllAgentSettings();
 
                             Mouse.OverrideCursor = Cursors.Arrow;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            if (Listener != null)
+                                Listener.WriteError(ex.Message);
+                            Mouse.OverrideCursor = Cursors.Arrow;
+                        }
                     }
                 }
             }
         }
 
+        void ClearFields()
+        {
+            tbAgentVersion.Text = "";
+            tbCachePath.Text = "";
+            tbDNSSuffix.Text = "";
+            tbGUID.Text = "";
+            tbInetMP.Text = "";
+            tbLogPath.Text = "";
+            tbMP.Text = "";
+            tbProxyMP.Text = "";
+            tbSiteCode.Text = "";
+            tbSetupPath.Text = "";
+            tbSLP.Text = "";
+            tbHTTPPort.Text = "";
+            tbHTTPSPort.Text = "";
+            cbAutoSite.IsChecked = false;
+
+            tbOSCaption.Text = "";
+            tbOSVersionBuild.Text = "";
+            tbIPAddress.Text = "";
+            tbClientSite.Text = "";
+            tbBoundaryGroups.Text = "";
+            tbPrimaryUser.Text = "";
+            tbLastCheckedIn.Text = "";
+            ClientInfoSummary = "";
+        }
+
+        void LoadAllAgentSettings()
+        {
+            try { tbSiteCode.Text = oAgent.Client.AgentProperties.AssignedSite; } catch (Exception ex) { Log(ex); }
+            try { tbHTTPPort.Text = oAgent.Client.AgentProperties.HTTPPort.ToString(); } catch (Exception ex) { Log(ex); tbHTTPPort.Text = ""; }
+            try { tbHTTPSPort.Text = oAgent.Client.AgentProperties.HTTPSPort.ToString(); } catch (Exception ex) { Log(ex); tbHTTPSPort.Text = ""; }
+            try { tbAgentVersion.Text = oAgent.Client.AgentProperties.ClientVersion; } catch (Exception ex) { Log(ex); }
+            try { tbMP.Text = oAgent.Client.AgentProperties.ManagementPoint; } catch (Exception ex) { Log(ex); }
+            try { tbInetMP.Text = oAgent.Client.AgentProperties.ManagementPointInternet; } catch (Exception ex) { Log(ex); }
+            try { tbProxyMP.Text = oAgent.Client.AgentProperties.ManagementPointProxy; } catch (Exception ex) { Log(ex); }
+            try { tbDNSSuffix.Text = oAgent.Client.AgentProperties.DNSSuffix; } catch (Exception ex) { Log(ex); }
+            try { tbSLP.Text = oAgent.Client.AgentProperties.ServerLocatorPoint; } catch (Exception ex) { Log(ex); }
+            try { tbGUID.Text = oAgent.Client.AgentProperties.ClientId; } catch (Exception ex) { Log(ex); }
+            try { tbLogPath.Text = oAgent.Client.AgentProperties.LocalSCCMAgentLogPath; } catch (Exception ex) { Log(ex); }
+            try { tbCachePath.Text = oAgent.Client.SWCache.CachePath; } catch (Exception ex) { Log(ex); }
+            try { cbAutoSite.IsChecked = oAgent.Client.AgentProperties.EnableAutoAssignment; } catch (Exception ex) { Log(ex); }
+            try { tbSetupPath.Text = @"C:\Windows\ccmsetup"; } catch { }
+        }
+
+        void Log(Exception ex)
+        {
+            if (Listener != null && ex != null)
+                Listener.WriteError(ex.Message);
+        }
+
+        void LoadClientInformation()
+        {
+            try
+            {
+                ClientInfoSnapshot info = ClientInfoHelper.Load(oAgent);
+                tbOSCaption.Text = info.OSCaption;
+                tbOSVersionBuild.Text = info.OSVersionBuild;
+                tbIPAddress.Text = info.IPAddress;
+                tbClientSite.Text = info.SiteCode;
+                tbBoundaryGroups.Text = info.BoundaryGroups;
+                tbPrimaryUser.Text = info.PrimaryUser;
+                tbLastCheckedIn.Text = info.LastCheckedIn;
+                ClientInfoSummary = info.SummaryLine;
+                if (ClientInfoChanged != null)
+                    ClientInfoChanged();
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError("Unable to load client information: " + ex.Message);
+            }
+        }
+
+        private void imgReloadClientInfo_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (oAgent == null || !oAgent.isConnected)
+                return;
+
+            Mouse.OverrideCursor = Cursors.Wait;
+            try
+            {
+                LoadClientInformation();
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
+            Mouse.OverrideCursor = Cursors.Arrow;
+        }
+
         private void imgSiteCode_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            tbSiteCode.Text = oAgent.Client.AgentProperties.AssignedSite;
+            try
+            {
+                tbSiteCode.Text = oAgent.Client.AgentProperties.AssignedSite;
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
         private void imgAgentVersion_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            tbAgentVersion.Text = oAgent.Client.AgentProperties.ClientVersion;
+            try
+            {
+                tbAgentVersion.Text = oAgent.Client.AgentProperties.ClientVersion;
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
         private void imgMP_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            tbMP.Text = oAgent.Client.AgentProperties.ManagementPoint;
+            try
+            {
+                tbMP.Text = oAgent.Client.AgentProperties.ManagementPoint;
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
         private void imgProxyMP_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            tbProxyMP.Text = oAgent.Client.AgentProperties.ManagementPointProxy;
+            try
+            {
+                tbProxyMP.Text = oAgent.Client.AgentProperties.ManagementPointProxy;
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
         private void imgINetMP_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            tbInetMP.Text = oAgent.Client.AgentProperties.ManagementPointInternet;
+            try
+            {
+                tbInetMP.Text = oAgent.Client.AgentProperties.ManagementPointInternet;
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
         private void imgDNSSuffix_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            tbDNSSuffix.Text = oAgent.Client.AgentProperties.DNSSuffix;
+            try
+            {
+                tbDNSSuffix.Text = oAgent.Client.AgentProperties.DNSSuffix;
+            }
+            catch (Exception ex)
+            {
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
@@ -149,11 +277,13 @@ namespace ClientCenter
             {
                 tbHTTPPort.Text = oAgent.Client.AgentProperties.HTTPPort.ToString();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Listener.WriteError("Error: Unable to get the HTTP Port.");
-                Listener.WriteError(ex.Message);
-
+                if (Listener != null)
+                {
+                    Listener.WriteError("Error: Unable to get the HTTP Port.");
+                    Listener.WriteError(ex.Message);
+                }
                 tbHTTPPort.Text = "";
             }
             Mouse.OverrideCursor = Cursors.Arrow;
@@ -167,10 +297,13 @@ namespace ClientCenter
                 if (int.Parse(tbHTTPPort.Text) > 0)
                     oAgent.Client.AgentProperties.HTTPPort = int.Parse(tbHTTPPort.Text);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Listener.WriteError("Error: Unable to set the HTTP Port.");
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                {
+                    Listener.WriteError("Error: Unable to set the HTTP Port.");
+                    Listener.WriteError(ex.Message);
+                }
                 MessageBox.Show("Unable to set the HTTP Port.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
@@ -185,9 +318,11 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError("Error: Unable to get the HTTPS Port.");
-                Listener.WriteError(ex.Message);
-
+                if (Listener != null)
+                {
+                    Listener.WriteError("Error: Unable to get the HTTPS Port.");
+                    Listener.WriteError(ex.Message);
+                }
                 tbHTTPSPort.Text = "";
             }
             Mouse.OverrideCursor = Cursors.Arrow;
@@ -203,8 +338,11 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError("Error: Unable to set the HTTPS Port.");
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                {
+                    Listener.WriteError("Error: Unable to set the HTTPS Port.");
+                    Listener.WriteError(ex.Message);
+                }
                 MessageBox.Show("Unable to set the HTTPS Port.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
@@ -219,7 +357,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -232,7 +371,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
         }
 
@@ -245,7 +385,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -259,7 +400,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -271,11 +413,9 @@ namespace ClientCenter
             {
                 Process Explorer = new Process();
                 Explorer.StartInfo.FileName = "Explorer.exe";
-                
-                //Connect IPC$ if not already connected (not needed with integrated authentication)
+
                 if (!oAgent.ConnectIPC_)
                     oAgent.ConnectIPC_ = true;
-
 
                 string sLogPath = "";
                 try
@@ -297,7 +437,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -310,25 +451,17 @@ namespace ClientCenter
                 Process Explorer = new Process();
                 Explorer.StartInfo.FileName = "Explorer.exe";
 
-                //Connect IPC$ if not already connected (not needed with integrated authentication)
                 if (!oAgent.ConnectIPC_)
                     oAgent.ConnectIPC_ = true;
 
-                if (oAgent.Client.AgentProperties.isSCCM2012)
-                {
-                    Explorer.StartInfo.Arguments = @"\\" + oAgent.TargetHostname + @"\admin$\ccmsetup";
-                }
-                else
-                {
-                    Explorer.StartInfo.Arguments = @"\\" + oAgent.TargetHostname + @"\admin$\ccmsetup";
-                }
-
+                Explorer.StartInfo.Arguments = @"\\" + oAgent.TargetHostname + @"\admin$\ccmsetup";
                 Explorer.StartInfo.WindowStyle = ProcessWindowStyle.Normal;
                 Explorer.Start();
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -342,7 +475,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -355,7 +489,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
         }
 
@@ -366,8 +501,7 @@ namespace ClientCenter
             {
                 Process Explorer = new Process();
                 Explorer.StartInfo.FileName = "Explorer.exe";
-                
-                //Connect IPC$ if not already connected (not needed with integrated authentication)
+
                 if (!oAgent.ConnectIPC_)
                     oAgent.ConnectIPC_ = true;
 
@@ -391,7 +525,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -405,7 +540,8 @@ namespace ClientCenter
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -415,15 +551,9 @@ namespace ClientCenter
             Mouse.OverrideCursor = Cursors.Wait;
             try
             {
-
-                // Initializes the variables to pass to the MessageBox.Show method.
                 string message = "Do you want to restart the SCCM Agent?";
                 string caption = "SCCM Agent must be restarted!";
-                MessageBoxResult result;
-
-                // Displays the MessageBox.
-                result = MessageBox.Show(message, caption, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, MessageBoxOptions.DefaultDesktopOnly);
-
+                MessageBoxResult result = MessageBox.Show(message, caption, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, MessageBoxOptions.DefaultDesktopOnly);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -434,14 +564,13 @@ namespace ClientCenter
                 {
                     oAgent.Client.AgentProperties.EnableAutoAssignment = ((bool)cbAutoSite.IsChecked);
                 }
-
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
-
     }
 }
