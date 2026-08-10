@@ -47,7 +47,7 @@ namespace ClientCenter
                         {
                             Mouse.OverrideCursor = Cursors.Wait;
 
-                            spAgentSettings.IsEnabled = true;
+                            spRoot.IsEnabled = true;
                             spHTTPPort.IsEnabled = true;
                             spHTTPSPort.IsEnabled = true;
 
@@ -92,6 +92,8 @@ namespace ClientCenter
             tbBoundaryGroups.Text = "";
             tbPrimaryUser.Text = "";
             tbLastCheckedIn.Text = "";
+            tbSiteLookupNote.Text = "";
+            dgCollections.ItemsSource = null;
             ClientInfoSummary = "";
         }
 
@@ -131,6 +133,8 @@ namespace ClientCenter
                 tbBoundaryGroups.Text = info.BoundaryGroups;
                 tbPrimaryUser.Text = info.PrimaryUser;
                 tbLastCheckedIn.Text = info.LastCheckedIn;
+                tbSiteLookupNote.Text = info.SiteLookupNote ?? "";
+                dgCollections.ItemsSource = info.Collections;
                 ClientInfoSummary = info.SummaryLine;
                 if (ClientInfoChanged != null)
                     ClientInfoChanged();
