@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
-using ClientCenter.Controls;
 using sccmclictr.automation;
 
 namespace ClientCenter
@@ -17,13 +16,6 @@ namespace ClientCenter
         private SCCMAgent oAgent;
 
         public MyTraceListener Listener;
-
-        /// <summary>
-        /// Compact one-line client summary for the main connection bar.
-        /// </summary>
-        public string ClientInfoSummary { get; private set; } = "";
-
-        public event Action ClientInfoChanged;
 
         public AgentSettingItem()
         {
@@ -47,12 +39,11 @@ namespace ClientCenter
                         {
                             Mouse.OverrideCursor = Cursors.Wait;
 
-                            spRoot.IsEnabled = true;
+                            spAgentSettings.IsEnabled = true;
                             spHTTPPort.IsEnabled = true;
                             spHTTPSPort.IsEnabled = true;
 
                             ClearFields();
-                            LoadClientInformation();
                             LoadAllAgentSettings();
 
                             Mouse.OverrideCursor = Cursors.Arrow;
@@ -84,17 +75,6 @@ namespace ClientCenter
             tbHTTPPort.Text = "";
             tbHTTPSPort.Text = "";
             cbAutoSite.IsChecked = false;
-
-            tbOSCaption.Text = "";
-            tbOSVersionBuild.Text = "";
-            tbIPAddress.Text = "";
-            tbClientSite.Text = "";
-            tbBoundaryGroups.Text = "";
-            tbPrimaryUser.Text = "";
-            tbLastCheckedIn.Text = "";
-            tbSiteLookupNote.Text = "";
-            dgCollections.ItemsSource = null;
-            ClientInfoSummary = "";
         }
 
         void LoadAllAgentSettings()
@@ -119,49 +99,6 @@ namespace ClientCenter
         {
             if (Listener != null && ex != null)
                 Listener.WriteError(ex.Message);
-        }
-
-        void LoadClientInformation()
-        {
-            try
-            {
-                ClientInfoSnapshot info = ClientInfoHelper.Load(oAgent);
-                tbOSCaption.Text = info.OSCaption;
-                tbOSVersionBuild.Text = info.OSVersionBuild;
-                tbIPAddress.Text = info.IPAddress;
-                tbClientSite.Text = info.SiteCode;
-                tbBoundaryGroups.Text = info.BoundaryGroups;
-                tbPrimaryUser.Text = info.PrimaryUser;
-                tbLastCheckedIn.Text = info.LastCheckedIn;
-                tbSiteLookupNote.Text = info.SiteLookupNote ?? "";
-                dgCollections.ItemsSource = info.Collections;
-                ClientInfoSummary = info.SummaryLine;
-                if (ClientInfoChanged != null)
-                    ClientInfoChanged();
-            }
-            catch (Exception ex)
-            {
-                if (Listener != null)
-                    Listener.WriteError("Unable to load client information: " + ex.Message);
-            }
-        }
-
-        private void imgReloadClientInfo_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (oAgent == null || !oAgent.isConnected)
-                return;
-
-            Mouse.OverrideCursor = Cursors.Wait;
-            try
-            {
-                LoadClientInformation();
-            }
-            catch (Exception ex)
-            {
-                if (Listener != null)
-                    Listener.WriteError(ex.Message);
-            }
-            Mouse.OverrideCursor = Cursors.Arrow;
         }
 
         private void imgSiteCode_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

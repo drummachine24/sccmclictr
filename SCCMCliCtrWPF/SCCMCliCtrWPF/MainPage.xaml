@@ -365,6 +365,14 @@
                                                 </StackPanel>
                                             </TreeViewItem.Header>
                                         </TreeViewItem>
+                                        <TreeViewItem Tag="ClientInformation" Name="tviClientInformation">
+                                            <TreeViewItem.Header>
+                                                <StackPanel Orientation="Horizontal" >
+                                                    <Image Source="/SCCMCliCtrWPF;component/Images/Computer.ico" Stretch="Uniform" Width="20" Height="20"/>
+                                                    <TextBlock Text="Client Information" Margin="3,0,0,0" ToolTip="OS, site, boundary groups, and collections."></TextBlock>
+                                                </StackPanel>
+                                            </TreeViewItem.Header>
+                                        </TreeViewItem>
                                         <TreeViewItem Tag="Components">
                                             <TreeViewItem.Header>
                                                 <StackPanel Orientation="Horizontal" >
@@ -474,6 +482,11 @@
                         <TabItem Header="Agent Settings" Name="AgentSettingsPanel" Tag="AgentSettings" IsSelected="False">
                             <Grid>
                                 <my4:AgentSettingItem HorizontalAlignment="Center" x:Name="agentSettingItem1" VerticalAlignment="Center" IsEnabled="False" />
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="Client Information" Name="ClientInformationPanel" Tag="ClientInformation" IsSelected="False">
+                            <Grid>
+                                <my6:ClientInformationGrid x:Name="clientInformationGrid1" />
                             </Grid>
                         </TabItem>
                         <TabItem Header="Log Monitoring" Tag="LogMonitoring" Name="LogMonitoringPanel">
