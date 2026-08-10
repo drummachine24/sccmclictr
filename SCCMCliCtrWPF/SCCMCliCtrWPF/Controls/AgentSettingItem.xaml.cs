@@ -30,6 +30,12 @@ namespace ClientCenter
             }
             set
             {
+                if (value == null)
+                {
+                    oAgent = null;
+                    return;
+                }
+
                 if (value.isConnected)
                 {
                     if (oAgent != value)
@@ -44,12 +50,15 @@ namespace ClientCenter
                             spHTTPSPort.IsEnabled = true;
 
                             ClearFields();
+                            AppLogger.Info("Loading agent settings for " + (oAgent.TargetHostname ?? ""));
                             LoadAllAgentSettings();
+                            AppLogger.Info("Agent settings load complete");
 
                             Mouse.OverrideCursor = Cursors.Arrow;
                         }
                         catch (Exception ex)
                         {
+                            AppLogger.Error("AgentSettingItem.SCCMAgentConnection", ex);
                             if (Listener != null)
                                 Listener.WriteError(ex.Message);
                             Mouse.OverrideCursor = Cursors.Arrow;
