@@ -27,13 +27,9 @@ namespace ClientCenter
         {
             try
             {
+                // Log only — showing MessageBox here can re-enter the dispatcher during
+                // startup/plugin load and leave the ribbon (Custom Actions) uninitialized.
                 AppLogger.Error("Dispatcher unhandled exception", e.Exception);
-                MessageBox.Show(
-                    "An unexpected error occurred.\n\n" + e.Exception.Message +
-                    "\n\nDetails were written to:\n" + AppLogger.LogPath,
-                    "Client Center Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
                 e.Handled = true;
             }
             catch

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Ribbon;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -84,142 +85,16 @@ namespace ClientCenter
             myTrace = new MyTraceListener(ref rStatus);
             myTrace.TraceOutputOptions = TraceOptions.None;
 
-            //Load external Agent Action Tool Plugins...
+            // Load external Agent Action Tool Plugins (Custom Actions / Tools / MainMenu).
+            // The Custom Actions ribbon tab starts Collapsed and is shown when CustomTools_* plugins load.
             try
             {
-                new Thread(() =>
-                {
-                    Thread.CurrentThread.IsBackground = true;
-                    string sCurrentDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                    foreach (string sFile in Directory.GetFiles(sCurrentDir, "Plugin*.dll", SearchOption.TopDirectoryOnly))
-                    {
-                        try
-                        {
-                            Assembly asm = Assembly.LoadFile(sFile);
-                            Type[] tlist = asm.GetTypes();
-                            foreach (Type t in tlist)
-                            {
-                                try
-                                {
-                                    if (t.Name.StartsWith("AgentActionTool_"))
-                                    {
-                                        //Make Tool Group visible
-                                        AnonymousDelegate dEnable = delegate ()
-                                        {
-                                            rgTools.Visibility = System.Windows.Visibility.Visible;
-                                            rgTools.IsEnabled = true;
-                                        };
-                                        Dispatcher.Invoke(dEnable);
-
-
-                                        new Thread(() =>
-                                        {
-                                            Thread.CurrentThread.IsBackground = true;
-                                            try
-                                            {
-                                                AnonymousDelegate dUpdate = delegate ()
-                                                {
-                                                    try
-                                                    {
-                                                        var obj = Activator.CreateInstance(t);
-                                                        btTools.Items.Add(obj);
-                                                    }
-                                                    catch (Exception ex)
-                                                    {
-                                                        Trace.WriteLine("Plugin load failed (" + t.FullName + "): " + ex.Message);
-                                                    }
-                                                };
-                                                Dispatcher.Invoke(dUpdate);
-                                            }
-                                            catch { }
-
-                                        }).Start();
-                                    }
-
-                                    if (t.Name.StartsWith("CustomTools_"))
-                                    {
-                                        new Thread(() =>
-                                        {
-                                            Thread.CurrentThread.IsBackground = true;
-                                            try
-                                            {
-                                                AnonymousDelegate dUpdate = delegate ()
-                                                {
-                                                    try
-                                                    {
-                                                        var obj = Activator.CreateInstance(t);
-                                                        var item = ((System.Windows.Controls.ContentControl)(obj)).Content;
-
-                                                        //Get first Child Control
-                                                        var first = ((System.Windows.Controls.Panel)(item)).Children[0];
-
-                                                        //Detach first Control from Grid
-                                                        Grid par = VisualTreeHelper.GetParent(first) as Grid;
-                                                        par.Children.Remove(first);
-
-                                                        //Add Control without binding to Grid
-                                                        ribCustActions.Tag = oAgent;
-                                                        ribCustActions.Items.Add(first);
-                                                        ribCustActions.IsEnabled = true;
-                                                        ribCustActions.Visibility = System.Windows.Visibility.Visible;
-                                                    }
-                                                    catch (Exception ex)
-                                                    {
-                                                        Trace.WriteLine("Plugin load failed (" + t.FullName + "): " + ex.Message);
-                                                    }
-                                                };
-                                                Dispatcher.Invoke(dUpdate);
-                                            }
-                                            catch { }
-
-                                        }).Start();
-                                    }
-
-                                    if (t.Name.StartsWith("MainMenu_"))
-                                    {
-                                        new Thread(() =>
-                                        {
-                                            Thread.CurrentThread.IsBackground = true;
-                                            try
-                                            {
-                                                AnonymousDelegate dUpdate = delegate ()
-                                                {
-                                                    try
-                                                    {
-                                                        var obj = Activator.CreateInstance(t);
-                                                        var item = ((System.Windows.Controls.ContentControl)(obj)).Content;
-
-                                                        //Get first Child Control
-                                                        var first = ((System.Windows.Controls.Panel)(item)).Children[0];
-
-                                                        //Detach first Control from Grid
-                                                        Grid par = VisualTreeHelper.GetParent(first) as Grid;
-                                                        par.Children.Remove(first);
-
-                                                        //Add Control without binding to Grid
-                                                        ribAgentActions.Items.Add(first);
-                                                        ribAgentActions.Visibility = System.Windows.Visibility.Visible;
-                                                    }
-                                                    catch (Exception ex)
-                                                    {
-                                                        Trace.WriteLine("Plugin load failed (" + t.FullName + "): " + ex.Message);
-                                                    }
-                                                };
-                                                Dispatcher.Invoke(dUpdate);
-                                            }
-                                            catch { }
-
-                                        }).Start();
-                                    }
-                                }
-                                catch { }
-                            }
-                        }
-                        catch { }
-                    }
-                }).Start();
+                new Thread(LoadPlugins).Start();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to start plugin loader thread", ex);
+            }
 
             Application.Current.Exit += new ExitEventHandler(Current_Exit);
             ThemeManager.SetActiveTheme(NavigationPaneTheme.WindowsLive);
@@ -372,6 +247,197 @@ namespace ClientCenter
             }
             catch { }
 
+        }
+
+        void LoadPlugins()
+        {
+            Thread.CurrentThread.IsBackground = true;
+            int customToolsLoaded = 0;
+            int agentToolsLoaded = 0;
+            int mainMenuLoaded = 0;
+
+            try
+            {
+                string pluginDir = GetPluginDirectory();
+                if (string.IsNullOrEmpty(pluginDir) || !Directory.Exists(pluginDir))
+                {
+                    AppLogger.Warn("Plugin directory not found: " + (pluginDir ?? "(null)"));
+                    return;
+                }
+
+                string[] pluginFiles = Directory.GetFiles(pluginDir, "Plugin*.dll", SearchOption.TopDirectoryOnly);
+                AppLogger.Info("Loading plugins from " + pluginDir + " (" + pluginFiles.Length + " Plugin*.dll files)");
+
+                foreach (string sFile in pluginFiles)
+                {
+                    try
+                    {
+                        AppLogger.Debug("Loading assembly: " + Path.GetFileName(sFile));
+                        // LoadFrom keeps dependency resolution rooted at the plugin folder.
+                        Assembly asm = Assembly.LoadFrom(sFile);
+                        Type[] tlist = GetLoadableTypes(asm);
+
+                        foreach (Type t in tlist)
+                        {
+                            if (t == null || string.IsNullOrEmpty(t.Name))
+                                continue;
+
+                            try
+                            {
+                                if (t.Name.StartsWith("AgentActionTool_"))
+                                {
+                                    Dispatcher.Invoke(() =>
+                                    {
+                                        try
+                                        {
+                                            rgTools.Visibility = Visibility.Visible;
+                                            rgTools.IsEnabled = true;
+                                            var obj = Activator.CreateInstance(t);
+                                            btTools.Items.Add(obj);
+                                            agentToolsLoaded++;
+                                            AppLogger.Info("Loaded AgentActionTool: " + t.Name);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            AppLogger.Error("Plugin load failed (" + t.FullName + ")", ex);
+                                        }
+                                    });
+                                }
+                                else if (t.Name.StartsWith("CustomTools_"))
+                                {
+                                    Dispatcher.Invoke(() =>
+                                    {
+                                        try
+                                        {
+                                            if (TryAddRibbonPlugin(t, ribCustActions))
+                                            {
+                                                ribCustActions.Tag = oAgent;
+                                                ribCustActions.IsEnabled = true;
+                                                ribCustActions.Visibility = Visibility.Visible;
+                                                customToolsLoaded++;
+                                                AppLogger.Info("Loaded CustomTools: " + t.Name);
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            AppLogger.Error("Plugin load failed (" + t.FullName + ")", ex);
+                                        }
+                                    });
+                                }
+                                else if (t.Name.StartsWith("MainMenu_"))
+                                {
+                                    Dispatcher.Invoke(() =>
+                                    {
+                                        try
+                                        {
+                                            if (TryAddRibbonPlugin(t, ribAgentActions))
+                                            {
+                                                ribAgentActions.Visibility = Visibility.Visible;
+                                                mainMenuLoaded++;
+                                                AppLogger.Info("Loaded MainMenu: " + t.Name);
+                                            }
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            AppLogger.Error("Plugin load failed (" + t.FullName + ")", ex);
+                                        }
+                                    });
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                AppLogger.Error("Plugin type handling failed (" + (t.FullName ?? t.Name) + ")", ex);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("Failed loading plugin assembly " + Path.GetFileName(sFile), ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Plugin loader failed", ex);
+            }
+            finally
+            {
+                AppLogger.Info("Plugin load complete. CustomTools=" + customToolsLoaded +
+                    " AgentActionTools=" + agentToolsLoaded + " MainMenu=" + mainMenuLoaded);
+                if (customToolsLoaded == 0)
+                    AppLogger.Warn("No CustomTools plugins loaded — Custom Actions tab will stay hidden.");
+            }
+        }
+
+        static string GetPluginDirectory()
+        {
+            try
+            {
+                string baseDir = AppContext.BaseDirectory;
+                if (!string.IsNullOrEmpty(baseDir) && Directory.Exists(baseDir))
+                    return Path.GetFullPath(baseDir);
+            }
+            catch { }
+
+            try
+            {
+                string loc = Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(loc))
+                    return Path.GetDirectoryName(loc);
+            }
+            catch { }
+
+            return null;
+        }
+
+        static Type[] GetLoadableTypes(Assembly asm)
+        {
+            try
+            {
+                return asm.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                AppLogger.Warn("Partial type load for " + asm.GetName().Name + ": " + ex.Message);
+                if (ex.LoaderExceptions != null)
+                {
+                    foreach (Exception le in ex.LoaderExceptions)
+                    {
+                        if (le != null)
+                            AppLogger.Warn("  loader: " + le.Message);
+                    }
+                }
+                return ex.Types ?? new Type[0];
+            }
+        }
+
+        static bool TryAddRibbonPlugin(Type t, RibbonTab targetTab)
+        {
+            var obj = Activator.CreateInstance(t);
+            var contentControl = obj as System.Windows.Controls.ContentControl;
+            if (contentControl == null)
+            {
+                AppLogger.Warn(t.Name + " is not a ContentControl");
+                return false;
+            }
+
+            var item = contentControl.Content;
+            var panel = item as System.Windows.Controls.Panel;
+            if (panel == null || panel.Children.Count == 0)
+            {
+                AppLogger.Warn(t.Name + " has no panel content to host in the ribbon");
+                return false;
+            }
+
+            UIElement first = panel.Children[0];
+            Grid par = VisualTreeHelper.GetParent(first) as Grid;
+            if (par != null)
+                par.Children.Remove(first);
+            else
+                panel.Children.Remove(first);
+
+            targetTab.Items.Add(first);
+            return true;
         }
 
         public void PageReset()
