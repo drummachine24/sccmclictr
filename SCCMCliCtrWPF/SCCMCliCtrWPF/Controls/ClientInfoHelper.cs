@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Management;
 using System.Management.Automation;
-using System.Management.Automation.Runspaces;
-using System.Text;
 using sccmclictr.automation;
 
 namespace ClientCenter.Controls
@@ -218,9 +216,7 @@ try {
 
         /// <summary>
         /// Resolve boundary group names and collection membership from the SMS Provider
-        /// (usually reachable via the client's management point / site server) using the
-        /// same credentials as the Client Center connection — from the local process to
-        /// avoid WinRM double-hop.
+        /// using System.Management (avoids PowerShell Core CimCmdlets load failures).
         /// </summary>
         static void EnrichFromSite(SCCMAgent agent, ClientInfoSnapshot info)
         {
@@ -242,24 +238,11 @@ try {
                 return;
             }
 
-            PSCredential cred = null;
-            try
-            {
-                if (agent.ConnectionInfo != null)
-                    cred = agent.ConnectionInfo.Credential;
-            }
-            catch { }
-
-            string bgIdsCsv = (info.BoundaryGroupIds ?? "").Replace("'", "''");
-            string computer = (info.ComputerName ?? "").Replace("'", "''");
-            string siteCode = info.SiteCode.Replace("'", "''");
-
+            ConnectionOptions options = BuildConnectionOptions(agent);
             var failures = new List<string>();
             foreach (string siteHost in hosts)
             {
-                string siteHostEsc = siteHost.Replace("'", "''");
-                string script = BuildSiteScript(siteHostEsc, siteCode, computer, bgIdsCsv);
-                if (TryEnrichFromHost(info, script, cred, siteHost, failures))
+                if (TryEnrichFromHostWmi(info, siteHost, options, failures))
                     return;
             }
 
@@ -267,101 +250,45 @@ try {
                 info.SiteLookupNote = string.Join(" | ", failures);
         }
 
-        static bool TryEnrichFromHost(ClientInfoSnapshot info, string script, PSCredential cred, string siteHost, List<string> failures)
+        static ConnectionOptions BuildConnectionOptions(SCCMAgent agent)
+        {
+            var options = new ConnectionOptions
+            {
+                Impersonation = ImpersonationLevel.Impersonate,
+                Authentication = AuthenticationLevel.PacketPrivacy,
+                EnablePrivileges = true
+            };
+
+            try
+            {
+                PSCredential cred = agent.ConnectionInfo != null ? agent.ConnectionInfo.Credential : null;
+                if (cred != null)
+                {
+                    options.Username = cred.UserName;
+                    options.SecurePassword = cred.Password;
+                }
+            }
+            catch { }
+
+            return options;
+        }
+
+        static bool TryEnrichFromHostWmi(ClientInfoSnapshot info, string siteHost, ConnectionOptions options, List<string> failures)
         {
             try
             {
-                using (var runspace = RunspaceFactory.CreateRunspace())
-                {
-                    runspace.Open();
-                    if (cred != null)
-                        runspace.SessionStateProxy.SetVariable("cred", cred);
-                    else
-                        runspace.SessionStateProxy.SetVariable("cred", null);
+                string ns = @"\\" + siteHost + @"\root\SMS\site_" + info.SiteCode;
+                var scope = new ManagementScope(ns, options);
+                scope.Connect();
 
-                    using (var ps = PowerShell.Create())
-                    {
-                        ps.Runspace = runspace;
-                        ps.AddScript(script);
+                var notes = new List<string>();
+                ResolveBoundaryGroupNames(scope, info, notes);
+                ResolveCollections(scope, info, notes);
 
-                        Collection<PSObject> results = ps.Invoke();
-                        if (ps.HadErrors && (results == null || results.Count == 0))
-                        {
-                            var errs = ps.Streams.Error.Select(e => e.ToString()).Where(s => !string.IsNullOrWhiteSpace(s)).Take(1);
-                            failures.Add(siteHost + ": " + string.Join("; ", errs));
-                            return false;
-                        }
+                if (notes.Count > 0)
+                    info.SiteLookupNote = string.Join(" | ", notes);
 
-                        PSObject po = results != null ? results.FirstOrDefault() : null;
-                        if (po == null)
-                        {
-                            failures.Add(siteHost + ": no data returned");
-                            return false;
-                        }
-
-                        string note = Prop(po, "Note");
-                        // Treat total failure of both lookups as retry-next-host
-                        string bgNames = Prop(po, "BoundaryGroupNames");
-                        object collObj = null;
-                        try { collObj = po.Properties["Collections"] != null ? po.Properties["Collections"].Value : null; } catch { }
-
-                        bool hasCollections = false;
-                        var rows = new List<ClientCollectionRow>();
-                        if (collObj is System.Collections.IEnumerable enumerable && !(collObj is string))
-                        {
-                            foreach (object item in enumerable)
-                            {
-                                var cpo = item as PSObject;
-                                if (cpo == null && item != null)
-                                    cpo = PSObject.AsPSObject(item);
-                                if (cpo == null)
-                                    continue;
-                                string name = Prop(cpo, "Name");
-                                string id = Prop(cpo, "CollectionID");
-                                if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(id))
-                                    continue;
-                                hasCollections = true;
-                                rows.Add(new ClientCollectionRow
-                                {
-                                    Name = name,
-                                    CollectionID = id,
-                                    Comment = Prop(cpo, "Comment")
-                                });
-                            }
-                        }
-
-                        bool resolvedNames = !string.IsNullOrWhiteSpace(bgNames) &&
-                            (string.IsNullOrWhiteSpace(info.BoundaryGroupIds) ||
-                             !string.Equals(bgNames, info.BoundaryGroupIds, StringComparison.OrdinalIgnoreCase) ||
-                             bgNames.IndexOf(',') >= 0 ||
-                             !bgNames.All(char.IsDigit));
-
-                        // If both lookups failed hard, try next host
-                        if (!string.IsNullOrWhiteSpace(note) && note.IndexOf("failed", StringComparison.OrdinalIgnoreCase) >= 0 && !hasCollections && !resolvedNames)
-                        {
-                            failures.Add(siteHost + ": " + note);
-                            return false;
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(bgNames))
-                            info.BoundaryGroups = bgNames;
-                        else if (!string.IsNullOrWhiteSpace(info.BoundaryGroupIds))
-                            info.SiteLookupNote = "Boundary group names unavailable; showing IDs.";
-
-                        info.Collections = rows
-                            .GroupBy(r => r.CollectionID + "|" + r.Name, StringComparer.OrdinalIgnoreCase)
-                            .Select(g => g.First())
-                            .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
-                            .ToList();
-
-                        if (!string.IsNullOrWhiteSpace(note))
-                            info.SiteLookupNote = note;
-                        else if (info.Collections.Count == 0)
-                            info.SiteLookupNote = "Queried " + siteHost + " for collections (none returned).";
-
-                        return true;
-                    }
-                }
+                return true;
             }
             catch (Exception ex)
             {
@@ -370,65 +297,114 @@ try {
             }
         }
 
-        static string BuildSiteScript(string siteHost, string siteCode, string computer, string bgIdsCsv)
+        static void ResolveBoundaryGroupNames(ManagementScope scope, ClientInfoSnapshot info, List<string> notes)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("$ErrorActionPreference = 'Stop'");
-            sb.AppendLine("$siteHost = '" + siteHost + "'");
-            sb.AppendLine("$siteCode = '" + siteCode + "'");
-            sb.AppendLine("$computer = '" + computer + "'");
-            sb.AppendLine("$bgIdsCsv = '" + bgIdsCsv + "'");
-            sb.AppendLine(@"
-$cimParams = @{ ComputerName = $siteHost; Namespace = ""root\SMS\site_$siteCode"" }
-if ($cred) { $cimParams['Credential'] = $cred }
+            var ids = (info.BoundaryGroupIds ?? "")
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => s.Length > 0)
+                .ToList();
 
-$note = ''
-$bgNames = @()
-try {
-    $ids = @($bgIdsCsv -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    if ($ids.Count -gt 0) {
-        $groups = @(Get-CimInstance @cimParams -ClassName SMS_BoundaryGroup -ErrorAction Stop)
-        foreach ($id in $ids) {
-            $match = $groups | Where-Object { [string]$_.GroupID -eq $id } | Select-Object -First 1
-            if ($match -and $match.Name) { $bgNames += [string]$match.Name }
-            else { $bgNames += $id }
-        }
-    }
-} catch {
-    $note = ""Boundary group lookup failed: $($_.Exception.Message)""
-    $bgNames = @($bgIdsCsv -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-}
+            if (ids.Count == 0)
+                return;
 
-$collections = @()
-try {
-    $names = @($computer)
-    if ($computer -match '\.') { $names += ($computer -split '\.')[0] }
-    $names = $names | Select-Object -Unique
-    foreach ($n in $names) {
-        $query = ""SELECT SMS_Collection.Name, SMS_Collection.CollectionID, SMS_Collection.Comment FROM SMS_FullCollectionMembership, SMS_Collection WHERE SMS_FullCollectionMembership.Name = '$n' AND SMS_FullCollectionMembership.CollectionID = SMS_Collection.CollectionID""
-        $found = @(Get-CimInstance @cimParams -Query $query -ErrorAction Stop)
-        foreach ($c in $found) {
-            $collections += [pscustomobject]@{
-                Name = [string]$c.Name
-                CollectionID = [string]$c.CollectionID
-                Comment = [string]$c.Comment
+            try
+            {
+                var nameById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                using (var searcher = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT GroupID, Name FROM SMS_BoundaryGroup")))
+                using (ManagementObjectCollection results = searcher.Get())
+                {
+                    foreach (ManagementObject mo in results)
+                    {
+                        using (mo)
+                        {
+                            string id = mo["GroupID"] != null ? mo["GroupID"].ToString() : "";
+                            string name = mo["Name"] != null ? mo["Name"].ToString() : "";
+                            if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(name))
+                                nameById[id] = name;
+                        }
+                    }
+                }
+
+                var resolved = new List<string>();
+                foreach (string id in ids)
+                    resolved.Add(nameById.ContainsKey(id) ? nameById[id] : id);
+
+                info.BoundaryGroups = string.Join(", ", resolved);
+            }
+            catch (Exception ex)
+            {
+                notes.Add("Boundary group lookup failed: " + ex.Message);
+                info.BoundaryGroups = info.BoundaryGroupIds;
             }
         }
-        if ($collections.Count -gt 0) { break }
-    }
-    $collections = @($collections | Sort-Object -Property Name)
-} catch {
-    if (-not $note) { $note = ""Collection lookup failed: $($_.Exception.Message)"" }
-    else { $note = ""$note | Collection lookup failed: $($_.Exception.Message)"" }
-}
 
-[pscustomobject]@{
-    BoundaryGroupNames = ($bgNames -join ', ')
-    Collections = @($collections)
-    Note = $note
-}
-");
-            return sb.ToString();
+        static void ResolveCollections(ManagementScope scope, ClientInfoSnapshot info, List<string> notes)
+        {
+            try
+            {
+                var names = new List<string>();
+                if (!string.IsNullOrWhiteSpace(info.ComputerName))
+                {
+                    names.Add(info.ComputerName.Trim());
+                    if (info.ComputerName.Contains("."))
+                        names.Add(info.ComputerName.Split('.')[0]);
+                }
+                names = names.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+                var rows = new List<ClientCollectionRow>();
+                foreach (string name in names)
+                {
+                    string safe = EscapeWql(name);
+                    string query =
+                        "SELECT SMS_Collection.Name, SMS_Collection.CollectionID, SMS_Collection.Comment " +
+                        "FROM SMS_FullCollectionMembership, SMS_Collection " +
+                        "WHERE SMS_FullCollectionMembership.Name = '" + safe + "' " +
+                        "AND SMS_FullCollectionMembership.CollectionID = SMS_Collection.CollectionID";
+
+                    using (var searcher = new ManagementObjectSearcher(scope, new ObjectQuery(query)))
+                    using (ManagementObjectCollection results = searcher.Get())
+                    {
+                        foreach (ManagementObject mo in results)
+                        {
+                            using (mo)
+                            {
+                                string cName = mo["Name"] != null ? mo["Name"].ToString() : "";
+                                string cId = mo["CollectionID"] != null ? mo["CollectionID"].ToString() : "";
+                                string comment = mo["Comment"] != null ? mo["Comment"].ToString() : "";
+                                if (string.IsNullOrWhiteSpace(cName) && string.IsNullOrWhiteSpace(cId))
+                                    continue;
+                                rows.Add(new ClientCollectionRow
+                                {
+                                    Name = cName ?? "",
+                                    CollectionID = cId ?? "",
+                                    Comment = comment ?? ""
+                                });
+                            }
+                        }
+                    }
+
+                    if (rows.Count > 0)
+                        break;
+                }
+
+                info.Collections = rows
+                    .GroupBy(r => r.CollectionID + "|" + r.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                notes.Add("Collection lookup failed: " + ex.Message);
+            }
+        }
+
+        static string EscapeWql(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "";
+            return value.Replace("\\", "\\\\").Replace("'", "\\'");
         }
 
         static string TryGetManagementPoint(SCCMAgent agent)
@@ -441,16 +417,6 @@ try {
             {
                 return "";
             }
-        }
-
-        static string FirstNonEmpty(params string[] values)
-        {
-            foreach (string v in values)
-            {
-                if (!string.IsNullOrWhiteSpace(v))
-                    return v.Trim();
-            }
-            return "";
         }
 
         static string Prop(PSObject o, string name)

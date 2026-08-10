@@ -39,7 +39,7 @@ namespace ClientCenter
 
             ribbon1.ContextMenu = null;
 
-            agentSettingItem1.ClientInfoChanged += UpdateClientInfoSummaryBar;
+            clientInformationGrid1.ClientInfoChanged += UpdateClientInfoSummaryBar;
 
             //Disbale SSL/TLS Errors
             System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
@@ -397,7 +397,7 @@ namespace ClientCenter
         {
             try
             {
-                string summary = agentSettingItem1 != null ? agentSettingItem1.ClientInfoSummary : "";
+                string summary = clientInformationGrid1 != null ? clientInformationGrid1.ClientInfoSummary : "";
                 if (string.IsNullOrWhiteSpace(summary))
                 {
                     ClearClientInfoSummaryBar();
@@ -619,6 +619,8 @@ namespace ClientCenter
 
                     agentSettingItem1.Listener = myTrace;
                     agentSettingItem1.SCCMAgentConnection = oAgent;
+                    clientInformationGrid1.Listener = myTrace;
+                    clientInformationGrid1.SCCMAgentConnection = oAgent;
                     UpdateClientInfoSummaryBar();
                     cacheGrid1.Listener = myTrace;
                     servicesGrid1.Listener = myTrace;
@@ -650,6 +652,7 @@ namespace ClientCenter
 
                     ribbon1.IsEnabled = true;
                     agentSettingItem1.IsEnabled = true;
+                    clientInformationGrid1.IsEnabled = true;
 
                     this.Title = sTarget;
 
@@ -659,6 +662,8 @@ namespace ClientCenter
                     //ribbon1.IsEnabled = false;
                     navigationPane1.IsEnabled = false;
                     agentSettingItem1.IsEnabled = false;
+                    clientInformationGrid1.IsEnabled = false;
+                    ClearClientInfoSummaryBar();
                     myTrace.WriteError("Unable to connect: " + sTarget);
                     myTrace.WriteError("Error: " + ex.Message);
                     ribAgentActions.IsEnabled = false;
@@ -689,6 +694,12 @@ namespace ClientCenter
                                 iTab.IsSelected = true;
                                 switch (iTab.Tag.ToString())
                                 {
+                                    case "AgentSettings":
+                                        agentSettingItem1.SCCMAgentConnection = oAgent;
+                                        break;
+                                    case "ClientInformation":
+                                        clientInformationGrid1.SCCMAgentConnection = oAgent;
+                                        break;
                                     case "Components":
                                         agentComponents1.SCCMAgentConnection = oAgent;
                                         break;
