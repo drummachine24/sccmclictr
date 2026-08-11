@@ -45,52 +45,50 @@ namespace ClientCenter.Controls
             }
             set
             {
-                if (value.isConnected)
+                if (value == null || !value.isConnected)
+                    return;
+
+                Mouse.OverrideCursor = Cursors.Wait;
+                try
                 {
-                    Mouse.OverrideCursor = Cursors.Wait;
+                    oAgent = value;
                     try
                     {
-                        //SCCMAgent oAgent = new SCCMAgent("localhost");
-                        //List<softwaredistribution.CCM_Application> lApps = oAgent.Client.SoftwareDistribution.Applications.OrderBy(t => t.FullName).ToList();
-                        //lApps.ToString();
+                        List<softwaredistribution.CCM_Application> oList = oAgent.Client.SoftwareDistribution.Applications_(false).ToList();
+                        iApplications = oList.GroupBy(t => t.Id).Select(grp => grp.FirstOrDefault()).OrderBy(o => o.FullName).ToList();
 
-                        if (oAgent != value)
+                        if (cb_OnlyUIEApps.IsChecked == true)
                         {
-                            oAgent = value;
-                            try
+                            dataGrid1.Items.Filter = (d) =>
                             {
-                                List<softwaredistribution.CCM_Application> oList = oAgent.Client.SoftwareDistribution.Applications_(false).ToList();
-                                iApplications = oList.GroupBy(t => t.Id).Select(grp => grp.FirstOrDefault()).OrderBy(o => o.FullName).ToList();
-
-                                if (cb_OnlyUIEApps.IsChecked == true)
-                                {
-                                    dataGrid1.Items.Filter = (d) =>
-                                    {
-                                        if (((softwaredistribution.CCM_Application)d).UserUIExperience == true)
-                                            return true; //if want to show in grid
-                                        return false;    //if don't want to show in grid
-                                    };
-                                }
-                                else
-                                {
-                                    dataGrid1.Items.Filter = null;
-                                }
-
-                                //TEST.Source = BitMapConvert.ToBitmapImage(iApplications[0].IconAsImage);
-
-                                dataGrid1.BeginInit();
-                                dataGrid1.ItemsSource = iApplications;
-                                dataGrid1.EndInit();
-                            }
-                            catch { }
+                                if (((softwaredistribution.CCM_Application)d).UserUIExperience == true)
+                                    return true;
+                                return false;
+                            };
                         }
+                        else
+                        {
+                            dataGrid1.Items.Filter = null;
+                        }
+
+                        dataGrid1.BeginInit();
+                        dataGrid1.ItemsSource = iApplications;
+                        dataGrid1.EndInit();
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
-                        ex.Message.ToString();
+                        AppLogger.Error("ApplicationGrid load failed", ex);
+                        if (Listener != null)
+                            Listener.WriteError("Unable to load applications: " + ex.Message);
                     }
-                    Mouse.OverrideCursor = Cursors.Arrow;
                 }
+                catch (Exception ex)
+                {
+                    AppLogger.Error("ApplicationGrid.SCCMAgentConnection", ex);
+                    if (Listener != null)
+                        Listener.WriteError(ex.Message);
+                }
+                Mouse.OverrideCursor = Cursors.Arrow;
             }
         }
 
@@ -112,7 +110,12 @@ namespace ClientCenter.Controls
 
                 SetSortInfo(dataGrid1, ssort);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Error("ApplicationGrid reload failed", ex);
+                if (Listener != null)
+                    Listener.WriteError("Unable to reload applications: " + ex.Message);
+            }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
 
