@@ -79,17 +79,20 @@ namespace ClientCenter
             Mouse.OverrideCursor = Cursors.Wait;
             try
             {
-                //Install all selected Updates;
                 List<softwareupdates.CCM_SoftwareUpdate> lUpdates = new List<softwareupdates.CCM_SoftwareUpdate>();
                 foreach (softwareupdates.CCM_SoftwareUpdate cUpdate in dataGrid1.SelectedItems)
                 {
                     lUpdates.Add(cUpdate);
                 }
+                AppLogger.Info("Installing " + lUpdates.Count + " software update(s)");
                 oAgent.Client.SoftwareUpdates.InstallUpdates(lUpdates);
+                AppLogger.Info("InstallUpdates command completed");
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                AppLogger.Error("InstallUpdates failed", ex);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -99,11 +102,15 @@ namespace ClientCenter
             Mouse.OverrideCursor = Cursors.Wait;
             try
             {
+                AppLogger.Info("InstallAllRequiredUpdates starting");
                 oAgent.Client.SoftwareUpdates.InstallAllRequiredUpdates();
+                AppLogger.Info("InstallAllRequiredUpdates completed");
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                AppLogger.Error("InstallAllRequiredUpdates failed", ex);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -130,11 +137,15 @@ namespace ClientCenter
             Mouse.OverrideCursor = Cursors.Wait;
             try
             {
+                AppLogger.Info("InstallAllApprovedUpdates starting");
                 oAgent.Client.SoftwareUpdates.InstallAllApprovedUpdates();
+                AppLogger.Info("InstallAllApprovedUpdates completed");
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                AppLogger.Error("InstallAllApprovedUpdates failed", ex);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
