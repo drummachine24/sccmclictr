@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Management;
 using System.Management.Automation;
+using Microsoft.Win32;
 using sccmclictr.automation;
 
 namespace ClientCenter.Controls
@@ -118,6 +119,13 @@ try {
     if ($ident -and $ident.'Site Server Name') { $siteServer = [string]$ident.'Site Server Name' }
     elseif ($ident -and $ident.SiteServer) { $siteServer = [string]$ident.SiteServer }
 } catch {}
+if (-not $siteServer) {
+    try {
+        $mc = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\SMS\Mobile Client' -ErrorAction SilentlyContinue
+        if ($mc -and $mc.'GP Site Server') { $siteServer = [string]$mc.'GP Site Server' }
+        elseif ($mc -and $mc.SiteServer) { $siteServer = [string]$mc.SiteServer }
+    } catch {}
+}
 [pscustomobject]@{
     OSCaption = [string]$os.Caption
     OSVersion = [string]$os.Version
@@ -215,8 +223,9 @@ try {
         }
 
         /// <summary>
-        /// Resolve boundary group names and collection membership from the SMS Provider
-        /// using System.Management (avoids PowerShell Core CimCmdlets load failures).
+        /// Resolve boundary group names and collection membership from the SMS Provider.
+        /// Candidate site systems are used only to locate SMS_ProviderLocation; queries run
+        /// against the Provider machine (not necessarily the Management Point).
         /// </summary>
         static void EnrichFromSite(SCCMAgent agent, ClientInfoSnapshot info)
         {
@@ -224,7 +233,13 @@ try {
                 return;
 
             var hosts = new List<string>();
-            foreach (string h in new[] { info.SiteServer, info.ManagementPoint, TryGetManagementPoint(agent) })
+            foreach (string h in new[]
+            {
+                info.SiteServer,
+                TryGetLocalAdminUiServer(),
+                info.ManagementPoint,
+                TryGetManagementPoint(agent)
+            })
             {
                 if (string.IsNullOrWhiteSpace(h))
                     continue;
@@ -232,11 +247,14 @@ try {
                 if (!hosts.Any(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase)))
                     hosts.Add(trimmed);
             }
+
             if (hosts.Count == 0)
             {
                 info.SiteLookupNote = "No site server / management point available to resolve boundary names / collections.";
                 return;
             }
+
+            AppLogger.Info("Client Info site lookup candidates for site " + info.SiteCode + ": " + string.Join(", ", hosts));
 
             ConnectionOptions options = BuildConnectionOptions(agent);
             var failures = new List<string>();
@@ -273,13 +291,22 @@ try {
             return options;
         }
 
-        static bool TryEnrichFromHostWmi(ClientInfoSnapshot info, string siteHost, ConnectionOptions options, List<string> failures)
+        static bool TryEnrichFromHostWmi(ClientInfoSnapshot info, string candidateHost, ConnectionOptions options, List<string> failures)
         {
             try
             {
-                string ns = @"\\" + siteHost + @"\root\SMS\site_" + info.SiteCode;
-                var scope = new ManagementScope(ns, options);
+                string providerHost;
+                string siteNamespace;
+                if (!TryResolveSmsProvider(candidateHost, info.SiteCode, options, out providerHost, out siteNamespace, failures))
+                    return false;
+
+                AppLogger.Info("Client Info using SMS Provider " + providerHost + " (via " + candidateHost + ") namespace " + siteNamespace);
+
+                var scope = new ManagementScope(siteNamespace, options);
                 scope.Connect();
+
+                if (string.IsNullOrWhiteSpace(info.SiteServer))
+                    info.SiteServer = providerHost;
 
                 var notes = new List<string>();
                 ResolveBoundaryGroupNames(scope, info, notes);
@@ -287,14 +314,148 @@ try {
 
                 if (notes.Count > 0)
                     info.SiteLookupNote = string.Join(" | ", notes);
+                else if (!string.Equals(candidateHost, providerHost, StringComparison.OrdinalIgnoreCase))
+                    info.SiteLookupNote = "SMS Provider: " + providerHost;
 
                 return true;
             }
             catch (Exception ex)
             {
-                failures.Add(siteHost + ": " + ex.Message);
+                AppLogger.Error("Client Info site enrichment failed via " + candidateHost, ex);
+                failures.Add(candidateHost + ": " + ex.Message);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Discover the SMS Provider for the client's site code from a candidate site system.
+        /// Management Points that do not host the SMS Provider will fail here and the next candidate is tried.
+        /// </summary>
+        static bool TryResolveSmsProvider(
+            string candidateHost,
+            string siteCode,
+            ConnectionOptions options,
+            out string providerHost,
+            out string siteNamespace,
+            List<string> failures)
+        {
+            providerHost = null;
+            siteNamespace = null;
+
+            try
+            {
+                var smsScope = new ManagementScope(@"\\" + candidateHost + @"\root\sms", options);
+                smsScope.Connect();
+
+                string safeSite = EscapeWql(siteCode);
+                string query =
+                    "SELECT Machine, NamespacePath, SiteCode, ProviderForLocalSite FROM SMS_ProviderLocation " +
+                    "WHERE SiteCode = '" + safeSite + "'";
+
+                string chosenMachine = null;
+                string chosenNsPath = null;
+                bool foundLocal = false;
+
+                using (var searcher = new ManagementObjectSearcher(smsScope, new ObjectQuery(query)))
+                using (ManagementObjectCollection results = searcher.Get())
+                {
+                    foreach (ManagementObject mo in results)
+                    {
+                        using (mo)
+                        {
+                            bool local = false;
+                            try
+                            {
+                                object pfl = mo["ProviderForLocalSite"];
+                                if (pfl is bool)
+                                    local = (bool)pfl;
+                                else if (pfl != null)
+                                    local = string.Equals(pfl.ToString(), "True", StringComparison.OrdinalIgnoreCase)
+                                        || pfl.ToString() == "1";
+                            }
+                            catch { }
+
+                            string machine = mo["Machine"] != null ? mo["Machine"].ToString().Trim() : "";
+                            string nsPath = mo["NamespacePath"] != null ? mo["NamespacePath"].ToString().Trim() : "";
+
+                            if (local)
+                            {
+                                chosenMachine = machine;
+                                chosenNsPath = nsPath;
+                                foundLocal = true;
+                                break;
+                            }
+
+                            if (!foundLocal
+                                && string.IsNullOrWhiteSpace(chosenMachine)
+                                && string.IsNullOrWhiteSpace(chosenNsPath))
+                            {
+                                chosenMachine = machine;
+                                chosenNsPath = nsPath;
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(chosenMachine) && string.IsNullOrWhiteSpace(chosenNsPath))
+                {
+                    failures.Add(candidateHost + ": no SMS_ProviderLocation for site " + siteCode);
+                    return false;
+                }
+
+                if (!string.IsNullOrWhiteSpace(chosenNsPath))
+                {
+                    siteNamespace = chosenNsPath.StartsWith(@"\\", StringComparison.Ordinal)
+                        ? chosenNsPath
+                        : @"\\" + chosenNsPath.TrimStart('\\');
+                    providerHost = chosenMachine;
+                    if (string.IsNullOrWhiteSpace(providerHost))
+                    {
+                        string path = siteNamespace.TrimStart('\\');
+                        int slash = path.IndexOf('\\');
+                        providerHost = slash > 0 ? path.Substring(0, slash) : candidateHost;
+                    }
+                }
+                else
+                {
+                    providerHost = chosenMachine;
+                    siteNamespace = @"\\" + chosenMachine + @"\root\SMS\site_" + siteCode;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                failures.Add(candidateHost + " (root\\sms): " + ex.Message);
+                return false;
+            }
+        }
+
+        static string TryGetLocalAdminUiServer()
+        {
+            string[] paths =
+            {
+                @"SOFTWARE\Wow6432Node\Microsoft\ConfigMgr10\AdminUI\Connection",
+                @"SOFTWARE\Microsoft\ConfigMgr10\AdminUI\Connection"
+            };
+
+            foreach (string path in paths)
+            {
+                try
+                {
+                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(path))
+                    {
+                        if (key == null)
+                            continue;
+                        object value = key.GetValue("Server");
+                        if (value != null && !string.IsNullOrWhiteSpace(value.ToString()))
+                            return value.ToString().Trim();
+                    }
+                }
+                catch { }
+            }
+
+            return "";
         }
 
         static void ResolveBoundaryGroupNames(ManagementScope scope, ClientInfoSnapshot info, List<string> notes)
