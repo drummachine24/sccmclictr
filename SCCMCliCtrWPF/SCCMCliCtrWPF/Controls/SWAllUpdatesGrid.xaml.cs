@@ -87,17 +87,19 @@ namespace ClientCenter
             Mouse.OverrideCursor = Cursors.Wait;
             try
             {
-                //Install all selected Updates;
                 List<softwareupdates.CCM_SoftwareUpdate> lUpdates = new List<softwareupdates.CCM_SoftwareUpdate>();
                 foreach (softwareupdates.CCM_SoftwareUpdate cUpdate in dataGrid1.SelectedItems)
                 {
                     lUpdates.Add(cUpdate);
                 }
+                AppLogger.Info("Installing " + lUpdates.Count + " software update(s) from All Updates grid");
                 oAgent.Client.SoftwareUpdates.InstallUpdates(lUpdates);
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                AppLogger.Error("All Updates InstallUpdates failed", ex);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
@@ -107,11 +109,14 @@ namespace ClientCenter
             Mouse.OverrideCursor = Cursors.Wait;
             try
             {
+                AppLogger.Info("InstallAllRequiredUpdates from All Updates grid");
                 oAgent.Client.SoftwareUpdates.InstallAllRequiredUpdates();
             }
             catch (Exception ex)
             {
-                Listener.WriteError(ex.Message);
+                AppLogger.Error("All Updates InstallAllRequiredUpdates failed", ex);
+                if (Listener != null)
+                    Listener.WriteError(ex.Message);
             }
             Mouse.OverrideCursor = Cursors.Arrow;
         }
