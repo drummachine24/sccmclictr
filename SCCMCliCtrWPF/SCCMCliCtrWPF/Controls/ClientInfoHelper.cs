@@ -386,7 +386,9 @@ if (-not $siteServer) {
                                 break;
                             }
 
-                            if (!foundLocal && chosenMachine == null && chosenNsPath == null)
+                            if (!foundLocal
+                                && string.IsNullOrWhiteSpace(chosenMachine)
+                                && string.IsNullOrWhiteSpace(chosenNsPath))
                             {
                                 chosenMachine = machine;
                                 chosenNsPath = nsPath;
