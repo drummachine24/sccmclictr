@@ -2,13 +2,6 @@
 <#
 .SYNOPSIS
     Registers or removes the Client Center right-click action in the ConfigMgr / MECM console.
-
-.DESCRIPTION
-    Writes sccmclictr.xml into each device-node Actions GUID under the Admin Console
-    XmlStorage\Extensions folder. Looks up the console from 32-bit and 64-bit
-    ConfigMgr10 Setup registry keys, then well-known install paths.
-
-    Does not fail the caller when no console is present (exit 0 after a warning).
 #>
 [CmdletBinding()]
 param(
@@ -29,8 +22,19 @@ $actionGuids = @(
     "fb04b7a5-bc4c-4468-8eb8-937d8eb90efb"
 )
 
-if (-not $ExePath) {
-    $ExePath = Join-Path $PSScriptRoot "SCCMCliCtrWPF.exe"
+$logDir = Join-Path $env:ProgramData "Client Center for Configuration Manager"
+$logPath = Join-Path $logDir "console-extension.log"
+
+function Write-Log {
+    param([string]$Message)
+    $line = "{0} {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message
+    Write-Host $line
+    try {
+        if (-not (Test-Path -LiteralPath $logDir)) {
+            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        }
+        Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
+    } catch { }
 }
 
 function Get-AdminConsoleRoots {
@@ -42,11 +46,16 @@ function Get-AdminConsoleRoots {
             $key = $base.OpenSubKey("SOFTWARE\Microsoft\ConfigMgr10\Setup")
             if ($key) {
                 $ui = [string]$key.GetValue("UI Installation Directory")
+                Write-Log ("Registry {0} UI Installation Directory={1}" -f $view, $ui)
                 if (-not [string]::IsNullOrWhiteSpace($ui)) {
                     $candidates.Add($ui.TrimEnd("\"))
                 }
+            } else {
+                Write-Log ("Registry {0}: ConfigMgr10\Setup not found" -f $view)
             }
-        } catch { }
+        } catch {
+            Write-Log ("Registry {0} error: {1}" -f $view, $_.Exception.Message)
+        }
     }
 
     $pf86 = ${env:ProgramFiles(x86)}
@@ -64,7 +73,12 @@ function Get-AdminConsoleRoots {
     foreach ($root in $candidates) {
         if ([string]::IsNullOrWhiteSpace($root)) { continue }
         if (-not $seen.Add($root)) { continue }
-        if (Test-Path -LiteralPath $root) { $root }
+        if (Test-Path -LiteralPath $root) {
+            Write-Log "Using console root: $root"
+            $root
+        } else {
+            Write-Log "Skip missing path: $root"
+        }
     }
 }
 
@@ -77,52 +91,68 @@ function Get-ActionXml {
 		<string>ContextMenu</string>
 	</ShowOn>
 	<Executable>
-		<FilePath>$safe</FilePath>
+		<FilePath>"$safe"</FilePath>
 		<Parameters>##SUB:Name##</Parameters>
 	</Executable>
 </ActionDescription>
 "@
 }
 
-$roots = @(Get-AdminConsoleRoots)
-if ($roots.Count -eq 0) {
-    Write-Host "ConfigMgr / MECM console not found; skipping console extension."
-    exit 0
-}
-
-if (-not $Unregister) {
-    if (-not (Test-Path -LiteralPath $ExePath)) {
-        throw "Client Center executable not found: $ExePath"
+try {
+    $scriptDir = $PSScriptRoot
+    if (-not $scriptDir) {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     }
-    $ExePath = [System.IO.Path]::GetFullPath($ExePath)
-}
+    if (-not $ExePath) {
+        $ExePath = Join-Path $scriptDir "SCCMCliCtrWPF.exe"
+    }
 
-$written = 0
-$removed = 0
-foreach ($root in $roots) {
-    foreach ($guid in $actionGuids) {
-        $actionDir = Join-Path $root "XmlStorage\Extensions\Actions\$guid"
-        $xmlPath = Join-Path $actionDir "sccmclictr.xml"
-        if ($Unregister) {
-            if (Test-Path -LiteralPath $xmlPath) {
-                Remove-Item -LiteralPath $xmlPath -Force -ErrorAction SilentlyContinue
-                $removed++
-                Write-Host "Removed $xmlPath"
+    Write-Log ("Unregister={0} ExePath={1}" -f $Unregister, $ExePath)
+
+    $roots = @(Get-AdminConsoleRoots)
+    if ($roots.Count -eq 0) {
+        Write-Log "ConfigMgr / MECM console not found; skipping."
+        exit 0
+    }
+
+    if (-not $Unregister) {
+        if (-not (Test-Path -LiteralPath $ExePath)) {
+            throw "Client Center executable not found: $ExePath"
+        }
+        $ExePath = [System.IO.Path]::GetFullPath($ExePath)
+        Write-Log "Resolved exe: $ExePath"
+    }
+
+    $written = 0
+    $removed = 0
+    $utf8Bom = New-Object System.Text.UTF8Encoding $true
+    foreach ($root in $roots) {
+        foreach ($guid in $actionGuids) {
+            $actionDir = Join-Path $root "XmlStorage\Extensions\Actions\$guid"
+            $xmlPath = Join-Path $actionDir "sccmclictr.xml"
+            if ($Unregister) {
+                if (Test-Path -LiteralPath $xmlPath) {
+                    Remove-Item -LiteralPath $xmlPath -Force
+                    $removed++
+                    Write-Log "Removed $xmlPath"
+                }
+            } else {
+                New-Item -ItemType Directory -Path $actionDir -Force | Out-Null
+                [System.IO.File]::WriteAllText($xmlPath, (Get-ActionXml -ClientCenterExe $ExePath), $utf8Bom)
+                $written++
+                Write-Log "Wrote $xmlPath"
             }
-        } else {
-            New-Item -ItemType Directory -Path $actionDir -Force | Out-Null
-            # UTF-8 without BOM; ConfigMgr console XML readers are picky about encoding.
-            $utf8 = New-Object System.Text.UTF8Encoding $false
-            [System.IO.File]::WriteAllText($xmlPath, (Get-ActionXml -ClientCenterExe $ExePath), $utf8)
-            $written++
-            Write-Host "Wrote $xmlPath"
         }
     }
-}
 
-if ($Unregister) {
-    Write-Host "Console extension removed from $($roots.Count) console install(s) ($removed file(s))."
-} else {
-    Write-Host "Console extension registered in $($roots.Count) console install(s) ($written file(s))."
-    Write-Host "Restart the ConfigMgr console if it is already open."
+    if ($Unregister) {
+        Write-Log "Removed $removed file(s) from $($roots.Count) console install(s)."
+    } else {
+        Write-Log "Wrote $written file(s) in $($roots.Count) console install(s). Restart the ConfigMgr console if it is open."
+    }
+    exit 0
+} catch {
+    Write-Log ("ERROR: " + $_.Exception.Message)
+    if ($_.ScriptStackTrace) { Write-Log $_.ScriptStackTrace }
+    exit 0
 }

@@ -134,6 +134,7 @@
       <_PluginPayload Include="$(_PluginSourceDir)Plugin_Explorer.dll.config" Condition="Exists('$(_PluginSourceDir)Plugin_Explorer.dll.config')" />
       <_PsScriptPayload Include="$(MSBuildProjectDirectory)\..\..\Plugins\Plugin_PSScripts\PSScripts\**\*" />
       <_ConsoleExtScript Include="$(MSBuildProjectDirectory)\..\..\tools\Register-ConsoleExtension.ps1" Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\Register-ConsoleExtension.ps1')" />
+      <_ConsoleExtScript Include="$(MSBuildProjectDirectory)\..\..\tools\Register-ConsoleExtension.cmd" Condition="Exists('$(MSBuildProjectDirectory)\..\..\tools\Register-ConsoleExtension.cmd')" />
     </ItemGroup>
     <Copy SourceFiles="@(_PluginPayload)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'@(_PluginPayload)' != ''" />
     <Copy SourceFiles="@(_PsScriptPayload)" DestinationFolder="$(PublishDir)PSScripts\%(RecursiveDir)" SkipUnchangedFiles="true" Condition="'@(_PsScriptPayload)' != ''" />

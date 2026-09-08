@@ -127,7 +127,7 @@
 		&lt;string&gt;ContextMenu&lt;/string&gt;
 	&lt;/ShowOn&gt;
 	&lt;Executable&gt;
-		&lt;FilePath&gt;{0}&lt;/FilePath&gt;
+		&lt;FilePath&gt;&amp;quot;{0}&amp;quot;&lt;/FilePath&gt;
 		&lt;Parameters&gt;##SUB:Name##&lt;/Parameters&gt;
 	&lt;/Executable&gt;
 &lt;/ActionDescription&gt;</value>

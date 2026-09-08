@@ -64,7 +64,7 @@ Name: "consoleext"; Description: "Register ConfigMgr console right-click extensi
 
 [Files]
 ; Portable install/uninstall scripts are ZIP-only; MSI/EXE use ARP uninstall.
-; Register-ConsoleExtension.ps1 is included so Setup can add/remove the console action.
+; Register-ConsoleExtension.cmd/.ps1 stay in Setup.exe so the console action can be added/removed.
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; \
   Excludes: "Install.cmd,Install-ClientCenter.ps1,Uninstall.cmd,Uninstall-ClientCenter.ps1"
 
@@ -75,10 +75,10 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\Register-ConsoleExtension.ps1"" -ExePath ""{app}\{#MyAppExeName}"""; StatusMsg: "Registering ConfigMgr console extension..."; Flags: runhidden waituntilterminated; Tasks: consoleext
+Filename: "{app}\Register-ConsoleExtension.cmd"; StatusMsg: "Registering ConfigMgr console extension..."; Flags: runhidden waituntilterminated; Tasks: consoleext
 
 [UninstallRun]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\Register-ConsoleExtension.ps1"" -Unregister"; Flags: runhidden waituntilterminated; RunOnceId: "UnregCmConsoleExt"
+Filename: "{app}\Register-ConsoleExtension.cmd"; Parameters: "-Unregister"; Flags: runhidden waituntilterminated; RunOnceId: "UnregCmConsoleExt"
 
 [Code]
 function InitializeSetup(): Boolean;

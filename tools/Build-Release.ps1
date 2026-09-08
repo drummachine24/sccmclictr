@@ -61,6 +61,7 @@ try {
     Copy-Item (Join-Path $PSScriptRoot "Install-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Uninstall-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Register-ConsoleExtension.ps1") $publishDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "Register-ConsoleExtension.cmd") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Install.cmd") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Uninstall.cmd") $publishDir -Force
 
@@ -85,6 +86,7 @@ Silent MSI example:
 Installers register a ConfigMgr console right-click action when the Admin Console
 is present. Restart the console after install. Skip with:
   msiexec /i ... /qn CONSOLEEXTENSION=0
+Log: %ProgramData%\Client Center for Configuration Manager\console-extension.log
 
 Requirements on THIS machine:
   - Windows 10/11 x64

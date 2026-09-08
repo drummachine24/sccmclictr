@@ -1697,13 +1697,14 @@ namespace ClientCenter
 
             string exePath = Assembly.GetExecutingAssembly().Location;
             string xml = string.Format(Properties.Resources.ConsoleExtension, System.Security.SecurityElement.Escape(exePath));
+            var utf8Bom = new UTF8Encoding(true);
             foreach (string sUIPath in roots)
             {
                 foreach (string sGUID in Properties.Settings.Default.ConsoleExtensionGUIDs)
                 {
                     string actionDir = Path.Combine(sUIPath, @"XmlStorage\Extensions\Actions", sGUID);
                     Directory.CreateDirectory(actionDir);
-                    File.WriteAllText(Path.Combine(actionDir, "sccmclictr.xml"), xml);
+                    File.WriteAllText(Path.Combine(actionDir, "sccmclictr.xml"), xml, utf8Bom);
                 }
             }
         }

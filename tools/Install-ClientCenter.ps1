@@ -234,8 +234,16 @@ try {
     Set-ItemProperty -Path $uninstallRegPath -Name "EstimatedSize" -Value ([int]$sizeKb) -Type DWord
 } catch { }
 
+$registerCmd = Join-Path $InstallDir "Register-ConsoleExtension.cmd"
 $registerScript = Join-Path $InstallDir "Register-ConsoleExtension.ps1"
-if (Test-Path -LiteralPath $registerScript) {
+if (Test-Path -LiteralPath $registerCmd) {
+    Write-Host "Registering ConfigMgr console extension..." -ForegroundColor Cyan
+    try {
+        cmd.exe /c "`"$registerCmd`""
+    } catch {
+        Write-Host "Console extension registration skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+} elseif (Test-Path -LiteralPath $registerScript) {
     Write-Host "Registering ConfigMgr console extension..." -ForegroundColor Cyan
     try {
         & $registerScript -ExePath $installedExe
