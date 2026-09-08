@@ -2,7 +2,7 @@
 ; Built from tools/Build-Installers.ps1
 ;
 ; Required defines (passed by ISCC):
-;   /DMyAppVersion=1.1.20
+;   /DMyAppVersion=1.1.21
 ;   /DPublishDir=C:\path\to\publish
 ;   /DOutputDir=C:\path\to\artifacts
 
