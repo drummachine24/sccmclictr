@@ -194,7 +194,10 @@ namespace ClientCenter
                         {
                             console.registerConsoleExtension();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("RegisterConsole failed", ex);
+                        }
                         bNoConnect = true;
                         Close();
                         return;
@@ -205,7 +208,10 @@ namespace ClientCenter
                         {
                             console.unregisterConsoleExtension();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("UnRegisterConsole failed", ex);
+                        }
                         bNoConnect = true;
                         Close();
                         return;
@@ -1639,62 +1645,66 @@ namespace ClientCenter
 
     public class console
     {
+        static IEnumerable<string> GetAdminConsoleRoots()
+        {
+            var found = new List<string>();
+            foreach (RegistryView view in new[] { RegistryView.Registry32, RegistryView.Registry64 })
+            {
+                try
+                {
+                    using (RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view))
+                    using (RegistryKey setup = baseKey.OpenSubKey(@"SOFTWARE\Microsoft\ConfigMgr10\Setup"))
+                    {
+                        if (setup == null)
+                            continue;
+                        string ui = setup.GetValue("UI Installation Directory", "") as string;
+                        if (!string.IsNullOrWhiteSpace(ui))
+                            found.Add(ui.TrimEnd('\\'));
+                    }
+                }
+                catch { }
+            }
+
+            string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            if (!string.IsNullOrEmpty(pf86))
+            {
+                found.Add(Path.Combine(pf86, @"Microsoft Endpoint Manager\AdminConsole"));
+                found.Add(Path.Combine(pf86, @"Microsoft Configuration Manager\AdminConsole"));
+            }
+            if (!string.IsNullOrEmpty(pf))
+            {
+                found.Add(Path.Combine(pf, @"Microsoft Endpoint Manager\AdminConsole"));
+                found.Add(Path.Combine(pf, @"Microsoft Configuration Manager\AdminConsole"));
+            }
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string root in found)
+            {
+                if (!string.IsNullOrWhiteSpace(root) && seen.Add(root) && Directory.Exists(root))
+                    yield return root;
+            }
+        }
+
         /// <summary>
         /// Create MMC Extension for ConfigMgr
         /// </summary>
         public static void registerConsoleExtension()
         {
-            //SCCM Console Installed ?
-            string sArchitecture = System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE").ToLower();
-            RegistryKey rAdminUI = null;
-            switch (sArchitecture)
-            {
-                case "x86":
-                    rAdminUI = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\ConfigMgr10\Setup");
-                    break;
-                case "amd64":
-                    rAdminUI = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\ConfigMgr10\Setup");
-                    break;
-                case "ia64":
-                    rAdminUI = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\ConfigMgr10\Setup");
-                    break;
-            }
-
-            if (rAdminUI != null)
-            {
-                string sUIPath = rAdminUI.GetValue("UI Installation Directory", "").ToString();
-                if (Directory.Exists(sUIPath))
-                {
-                    foreach (string sGUID in Properties.Settings.Default.ConsoleExtensionGUIDs)
-                    {
-                        Directory.CreateDirectory(sUIPath + @"\XmlStorage\Extensions\Actions\" + sGUID);
-                        TextWriter tw1 = new StreamWriter(sUIPath + @"\XmlStorage\Extensions\Actions\" + sGUID + "\\sccmclictr.xml");
-                        tw1.WriteLine(string.Format(Properties.Resources.ConsoleExtension, System.Reflection.Assembly.GetExecutingAssembly().Location));
-                        tw1.Close();
-                    }
-
-                    //Directory.CreateDirectory(sUIPath + @"\XmlStorage\Extensions\Actions\3fd01cd1-9e01-461e-92cd-94866b8d1f39");
-                    //TextWriter tw1 = new StreamWriter(sUIPath + @"\XmlStorage\Extensions\Actions\3fd01cd1-9e01-461e-92cd-94866b8d1f39\sccmclictr.xml");
-                    //tw1.WriteLine(string.Format(Properties.Resources.ConsoleExtension, System.Reflection.Assembly.GetExecutingAssembly().Location));
-                    //tw1.Close();
-
-                    //Directory.CreateDirectory(sUIPath + @"\XmlStorage\Extensions\Actions\ed9dee86-eadd-4ac8-82a1-7234a4646e62");
-                    //tw1 = new StreamWriter(sUIPath + @"\XmlStorage\Extensions\Actions\ed9dee86-eadd-4ac8-82a1-7234a4646e62\sccmclictr.xml");
-                    //tw1.WriteLine(string.Format(Properties.Resources.ConsoleExtension, System.Reflection.Assembly.GetExecutingAssembly().Location));
-                    //tw1.Close();
-
-
-
-                    //Directory.CreateDirectory(sUIPath + @"\XmlStorage\Extensions\Actions\0770186d-ea57-4276-a46b-7344ae081b58");
-                    //tw1 = new StreamWriter(sUIPath + @"\XmlStorage\Extensions\Actions\0770186d-ea57-4276-a46b-7344ae081b58\sccmclictr.xml");
-                    //tw1.WriteLine(string.Format(Properties.Resources.ConsoleExtension, System.Reflection.Assembly.GetExecutingAssembly().Location));
-                    //tw1.Close();
-                }
-            }
-            else
-            {
+            List<string> roots = GetAdminConsoleRoots().ToList();
+            if (roots.Count == 0)
                 throw new Exception("no ConfigMgr console installed.");
 
+            string exePath = Assembly.GetExecutingAssembly().Location;
+            string xml = string.Format(Properties.Resources.ConsoleExtension, System.Security.SecurityElement.Escape(exePath));
+            foreach (string sUIPath in roots)
+            {
+                foreach (string sGUID in Properties.Settings.Default.ConsoleExtensionGUIDs)
+                {
+                    string actionDir = Path.Combine(sUIPath, @"XmlStorage\Extensions\Actions", sGUID);
+                    Directory.CreateDirectory(actionDir);
+                    File.WriteAllText(Path.Combine(actionDir, "sccmclictr.xml"), xml);
+                }
             }
         }
 
@@ -1703,41 +1713,24 @@ namespace ClientCenter
         /// </summary>
         public static void unregisterConsoleExtension()
         {
-            string sArchitecture = System.Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE").ToLower();
-            RegistryKey rAdminUI = null;
-            switch (sArchitecture)
-            {
-                case "x86":
-                    rAdminUI = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\ConfigMgr10\Setup");
-                    break;
-                case "amd64":
-                    rAdminUI = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Wow6432Node\Microsoft\ConfigMgr10\Setup");
-                    break;
-                case "ia64":
-                    rAdminUI = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\ConfigMgr10\Setup");
-                    break;
-            }
+            List<string> roots = GetAdminConsoleRoots().ToList();
+            if (roots.Count == 0)
+                throw new Exception("no ConfigMgr console installed.");
 
-            //SCCM Console Installed ?
-            if (rAdminUI != null)
+            foreach (string sUIPath in roots)
             {
-                string sUIPath = rAdminUI.GetValue("UI Installation Directory", "").ToString();
-
                 foreach (string sGUID in Properties.Settings.Default.ConsoleExtensionGUIDs)
                 {
-                    if (File.Exists(sUIPath + @"\XmlStorage\Extensions\Actions\" + sGUID + "\\sccmclictr.xml"))
+                    string xmlPath = Path.Combine(sUIPath, @"XmlStorage\Extensions\Actions", sGUID, "sccmclictr.xml");
+                    if (File.Exists(xmlPath))
                     {
                         try
                         {
-                            File.Delete(sUIPath + @"\XmlStorage\Extensions\Actions\" + sGUID + "\\sccmclictr.xml");
+                            File.Delete(xmlPath);
                         }
                         catch { }
                     }
                 }
-            }
-            else
-            {
-                throw new Exception("no ConfigMgr console installed.");
             }
         }
     }

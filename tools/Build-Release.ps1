@@ -60,6 +60,7 @@ try {
     # Portable ZIP helpers (not used by MSI/EXE installers).
     Copy-Item (Join-Path $PSScriptRoot "Install-ClientCenter.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Uninstall-ClientCenter.ps1") $publishDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "Register-ConsoleExtension.ps1") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Install.cmd") $publishDir -Force
     Copy-Item (Join-Path $PSScriptRoot "Uninstall.cmd") $publishDir -Force
 
@@ -80,6 +81,10 @@ Portable ZIP options:
 
 Silent MSI example:
   msiexec /i ClientCenter-v$Version-win-x64.msi /qn
+
+Installers register a ConfigMgr console right-click action when the Admin Console
+is present. Restart the console after install. Skip with:
+  msiexec /i ... /qn CONSOLEEXTENSION=0
 
 Requirements on THIS machine:
   - Windows 10/11 x64

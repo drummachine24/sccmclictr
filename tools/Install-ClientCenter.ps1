@@ -234,6 +234,16 @@ try {
     Set-ItemProperty -Path $uninstallRegPath -Name "EstimatedSize" -Value ([int]$sizeKb) -Type DWord
 } catch { }
 
+$registerScript = Join-Path $InstallDir "Register-ConsoleExtension.ps1"
+if (Test-Path -LiteralPath $registerScript) {
+    Write-Host "Registering ConfigMgr console extension..." -ForegroundColor Cyan
+    try {
+        & $registerScript -ExePath $installedExe
+    } catch {
+        Write-Host "Console extension registration skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 Write-Host "Installation complete." -ForegroundColor Green
 Write-Host "Start Menu: $shortcutDir" -ForegroundColor Green
 Write-Host "Desktop shortcut created." -ForegroundColor Green

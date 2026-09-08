@@ -35,6 +35,25 @@
     <!-- Checked by default (Start Menu). Desktop opt-in matches Setup.exe. -->
     <Property Id="STARTMENUSHORTCUT" Value="1" Secure="yes" />
     <Property Id="DESKTOPSHORTCUT" Secure="yes" />
+    <Property Id="CONSOLEEXTENSION" Value="1" Secure="yes" />
+
+    <CustomAction
+        Id="CA_RegisterConsoleExt"
+        Directory="System64Folder"
+        ExeCommand="WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]Register-ConsoleExtension.ps1&quot; -ExePath &quot;[INSTALLFOLDER]SCCMCliCtrWPF.exe&quot;"
+        Execute="immediate"
+        Return="ignore" />
+    <CustomAction
+        Id="CA_UnregisterConsoleExt"
+        Directory="System64Folder"
+        ExeCommand="WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]Register-ConsoleExtension.ps1&quot; -Unregister"
+        Execute="immediate"
+        Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="CA_UnregisterConsoleExt" Before="RemoveFiles" Condition="Installed AND REMOVE=&quot;ALL&quot;" />
+      <Custom Action="CA_RegisterConsoleExt" After="InstallFinalize" Condition="CONSOLEEXTENSION=&quot;1&quot; AND NOT REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
 
     <Feature Id="ProductFeature" Title="Client Center for Configuration Manager" Level="1" ConfigurableDirectory="INSTALLFOLDER">
       <ComponentGroupRef Id="ProductComponents" />
@@ -54,7 +73,7 @@
     <StandardDirectory Id="DesktopFolder" />
 
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-      <!-- Harvest publish output; exclude portable PowerShell install helpers (ZIP-only). -->
+      <!-- Harvest publish output; exclude ZIP-only install helpers. Register-ConsoleExtension.ps1 stays in the MSI. -->
       <Files Include="!(bindpath.PublishDir)\**">
         <Exclude Files="!(bindpath.PublishDir)\Install.cmd" />
         <Exclude Files="!(bindpath.PublishDir)\Install-ClientCenter.ps1" />
