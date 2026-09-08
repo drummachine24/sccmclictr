@@ -67,8 +67,16 @@ function Register-DeleteOnReboot {
 $installedExe = Join-Path $InstallDir $exeName
 Stop-ClientCenterProcesses -TargetExePath $installedExe
 
+$registerCmd = Join-Path $InstallDir "Register-ConsoleExtension.cmd"
 $registerScript = Join-Path $InstallDir "Register-ConsoleExtension.ps1"
-if (Test-Path -LiteralPath $registerScript) {
+if (Test-Path -LiteralPath $registerCmd) {
+    Write-Host "Removing ConfigMgr console extension..." -ForegroundColor Cyan
+    try {
+        cmd.exe /c "`"$registerCmd`" -Unregister"
+    } catch {
+        Write-Host "Console extension removal skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+} elseif (Test-Path -LiteralPath $registerScript) {
     Write-Host "Removing ConfigMgr console extension..." -ForegroundColor Cyan
     try {
         & $registerScript -Unregister

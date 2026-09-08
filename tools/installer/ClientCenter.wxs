@@ -39,20 +39,22 @@
 
     <CustomAction
         Id="CA_RegisterConsoleExt"
-        Directory="System64Folder"
-        ExeCommand="WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]Register-ConsoleExtension.ps1&quot; -ExePath &quot;[INSTALLFOLDER]SCCMCliCtrWPF.exe&quot;"
-        Execute="immediate"
+        Directory="INSTALLFOLDER"
+        ExeCommand="cmd.exe /c Register-ConsoleExtension.cmd"
+        Execute="deferred"
+        Impersonate="no"
         Return="ignore" />
     <CustomAction
         Id="CA_UnregisterConsoleExt"
-        Directory="System64Folder"
-        ExeCommand="WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]Register-ConsoleExtension.ps1&quot; -Unregister"
-        Execute="immediate"
+        Directory="INSTALLFOLDER"
+        ExeCommand="cmd.exe /c Register-ConsoleExtension.cmd -Unregister"
+        Execute="deferred"
+        Impersonate="no"
         Return="ignore" />
 
     <InstallExecuteSequence>
       <Custom Action="CA_UnregisterConsoleExt" Before="RemoveFiles" Condition="Installed AND REMOVE=&quot;ALL&quot;" />
-      <Custom Action="CA_RegisterConsoleExt" After="InstallFinalize" Condition="CONSOLEEXTENSION=&quot;1&quot; AND NOT REMOVE=&quot;ALL&quot;" />
+      <Custom Action="CA_RegisterConsoleExt" After="InstallFiles" Condition="CONSOLEEXTENSION=&quot;1&quot; AND NOT REMOVE=&quot;ALL&quot;" />
     </InstallExecuteSequence>
 
     <Feature Id="ProductFeature" Title="Client Center for Configuration Manager" Level="1" ConfigurableDirectory="INSTALLFOLDER">
