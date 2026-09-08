@@ -6,6 +6,8 @@
     <RootNamespace>ClientCenter</RootNamespace>
     <AssemblyName>SCCMCliCtrWPF</AssemblyName>
     <UseWPF>true</UseWPF>
+    <!-- Plugins (PS scripts, Regedit SendKeys, etc.) need WinForms in the self-contained publish. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>

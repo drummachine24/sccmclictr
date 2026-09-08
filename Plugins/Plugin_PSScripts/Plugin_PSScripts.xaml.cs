@@ -5,8 +5,8 @@ using sccmclictr.automation;
 using System.IO;
 using System.Windows.Controls.Ribbon;
 using System.Threading;
-using System.Windows.Forms;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Cursors = System.Windows.Input.Cursors;
 using UserControl = System.Windows.Controls.UserControl;
 
@@ -116,9 +116,8 @@ namespace AgentActionTools
                 Mouse.OverrideCursor = Cursors.Wait;
 
                 _rgPS.IsDropDownOpen = false;
-                Application.DoEvents();
                 btRunPS.IsDropDownOpen = false;
-                Application.DoEvents();
+                PumpUi();
 
                 //Get PS from File
                 string sFile = ((RibbonButton)sender).Tag.ToString();
@@ -133,18 +132,30 @@ namespace AgentActionTools
                 System.Reflection.PropertyInfo pInfo = t.GetProperty("Agent");
                 oAgent = (SCCMAgent)pInfo.GetValue(null, null);
 
-                Application.DoEvents();
+                PumpUi();
                 Thread.Sleep(200);
-                Application.DoEvents();
+                PumpUi();
 
                 string sRet = oAgent.Client.GetStringFromPS(text);
                 oAgent.PSCode.TraceInformation(sRet);
+            }
+            catch (Exception ex)
+            {
+                if (oAgent != null && oAgent.PSCode != null)
+                    oAgent.PSCode.TraceInformation("Error: " + ex.Message);
+                else
+                    throw;
             }
             finally
             {
                 btRunPS.IsDropDownOpen = false;
                 Mouse.OverrideCursor = Cursors.Arrow;
             }
+        }
+
+        private void PumpUi()
+        {
+            _rgPS.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
         }
 
         private void btRunPS_Click(object sender, System.Windows.RoutedEventArgs e)
