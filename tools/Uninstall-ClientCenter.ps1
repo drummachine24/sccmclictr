@@ -67,6 +67,16 @@ function Register-DeleteOnReboot {
 $installedExe = Join-Path $InstallDir $exeName
 Stop-ClientCenterProcesses -TargetExePath $installedExe
 
+$registerScript = Join-Path $InstallDir "Register-ConsoleExtension.ps1"
+if (Test-Path -LiteralPath $registerScript) {
+    Write-Host "Removing ConfigMgr console extension..." -ForegroundColor Cyan
+    try {
+        & $registerScript -Unregister
+    } catch {
+        Write-Host "Console extension removal skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 $startMenu = [Environment]::GetFolderPath("Programs")
 $shortcutDir = Join-Path $startMenu "Client Center for Configuration Manager"
 $desktop = [Environment]::GetFolderPath("Desktop")
