@@ -1,196 +1,152 @@
 ﻿using System;
-using System.Windows;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
-using System.IO;
-using RZUpdate;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace AgentActionTools
 {
-    /// <summary>
-    /// Interaction logic for UserControl1.xaml
-    /// </summary>
     public partial class CustomTools_SelfUpdate : System.Windows.Controls.UserControl
     {
-        //public SCCMAgent oAgent;
+        const string ReleasesUrl = "https://github.com/drummachine24/sccmclictr/releases";
+        const string LatestApiUrl = "https://api.github.com/repos/drummachine24/sccmclictr/releases/latest";
+        static readonly HttpClient Http = CreateClient();
+        bool _suppressToggle;
+
         public CustomTools_SelfUpdate()
         {
             InitializeComponent();
+            _suppressToggle = true;
+            cbAutoCheck.IsChecked = Properties.Settings.Default.AutoUpdateEnabled;
+            _suppressToggle = false;
 
+            // MainPage extracts the RibbonGroup from this UserControl, so UserControl.Loaded
+            // never fires. Queue the opt-in check after the UI is idle. No network in the ctor.
+            Dispatcher.BeginInvoke(new Action(() => { _ = MaybeAutoCheckAsync(); }), DispatcherPriority.ApplicationIdle);
+        }
+
+        static HttpClient CreateClient()
+        {
+            var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("ClientCenter-SelfUpdate");
+            http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            return http;
+        }
+
+        async Task MaybeAutoCheckAsync()
+        {
+            if (!Properties.Settings.Default.AutoUpdateEnabled)
+                return;
+            if ((DateTime.Now - Properties.Settings.Default.LastUpdateCheck) < TimeSpan.FromDays(2))
+                return;
+            await CheckForUpdateAsync(false);
+        }
+
+        void cbAutoCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressToggle)
+                return;
+            Properties.Settings.Default.AutoUpdateEnabled = cbAutoCheck.IsChecked == true;
+            Properties.Settings.Default.Save();
+        }
+
+        async void btCheckUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
             try
             {
-                //Disbale SSL/TLS Errors
-                System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-                //Disable CRL Check
-                System.Net.ServicePointManager.CheckCertificateRevocationList = false;
+                await CheckForUpdateAsync(true);
+            }
+            finally
+            {
+                Mouse.OverrideCursor = null;
+            }
+        }
 
-                //No check on first start...
-                if (Properties.Settings.Default.LastUpdateCheck == new DateTime(2016,1,1))
+        async Task CheckForUpdateAsync(bool interactive)
+        {
+            try
+            {
+                Assembly entry = Assembly.GetEntryAssembly();
+                if (entry == null)
                 {
-                    Properties.Settings.Default.LastUpdateCheck = DateTime.Now;
-                    Properties.Settings.Default.Save(); //Fixed 25.5.2016 
+                    if (interactive)
+                        MessageBox.Show("Could not determine the installed version.", "Update", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-
-                if ((DateTime.Now - Properties.Settings.Default.LastUpdateCheck) >= new TimeSpan(2, 0, 0, 0) & Properties.Settings.Default.AutoUpdateEnabled)
+                string current = FileVersionInfo.GetVersionInfo(entry.Location).FileVersion;
+                using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8)))
+                using (HttpResponseMessage response = await Http.GetAsync(LatestApiUrl, cts.Token))
                 {
-                    //btCheckUpdate.IsEnabled = SCCMCliCtr.Customization.CheckLicense();
-                    string sVersion = FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetEntryAssembly().Location).FileVersion; ;
+                    if (!response.IsSuccessStatusCode)
+                        throw new HttpRequestException("GitHub returned " + (int)response.StatusCode + " " + response.ReasonPhrase);
 
-                    RZUpdater oRZUpdate = new RZUpdater();
-                    var oUpdate = oRZUpdate.CheckForUpdateAsync("Client Center for Configuration Manager", sVersion, "Zander Tools" ).Result;
-
-                    try
+                    string json = await response.Content.ReadAsStringAsync(cts.Token);
+                    using (JsonDocument doc = JsonDocument.Parse(json))
                     {
+                        string tag = doc.RootElement.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() : null;
+                        string htmlUrl = doc.RootElement.TryGetProperty("html_url", out var urlEl) ? urlEl.GetString() : ReleasesUrl;
+                        if (string.IsNullOrWhiteSpace(htmlUrl))
+                            htmlUrl = ReleasesUrl;
+
                         Properties.Settings.Default.LastUpdateCheck = DateTime.Now;
                         Properties.Settings.Default.Save();
 
-                        if (IsUserAnAdmin())
+                        if (string.IsNullOrWhiteSpace(tag) || !IsNewer(tag, current))
                         {
-
-                            //Delete an old RZUpdate.exe
-                            if (File.Exists(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe")))
-                            {
-                                try
-                                {
-                                    File.Delete(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"));
-                                }
-                                catch { }
-                            }
-
-                            if (oUpdate != null)
-                            {
-                                //Console.WriteLine("New Version: " + oUpdate.SW.ProductVersion);
-                                ExtractSaveResource("AgentActionTools.RZGet.exe", Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"));
-
-                                if (System.Windows.MessageBox.Show("Do you want to install Version: " + oUpdate.SW.ProductVersion, "Update available", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                                {
-                                    try
-                                    {
-                                        Process.Start(new ProcessStartInfo(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"), "install \"SCCMCliCtr\"") { UseShellExecute = true });
-                                        Process.GetCurrentProcess().Kill();
-                                    }
-                                    catch
-                                    {
-                                        System.Windows.MessageBox.Show("updated failed. Please run ClientCenter with Admin rights to install updates... ", "Failed", MessageBoxButton.OK, MessageBoxImage.Error);
-                                    }
-                                }
-                            }
+                            if (interactive)
+                                MessageBox.Show("No update available.", "Update", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
                         }
-                        else
-                        {
-                            if (oUpdate != null)
-                            {
-                                System.Windows.MessageBox.Show("An newer Version is available: " + oUpdate.SW.ProductVersion + ". You have to start ClientCenter as Admin to install the update", "Update available", MessageBoxButton.OK, MessageBoxImage.Information);
-                            }
-                        }
+
+                        string msg = "A newer version is available: " + tag + " (you have " + current + ")."
+                            + Environment.NewLine + Environment.NewLine
+                            + "Open the GitHub releases page?";
+                        if (MessageBox.Show(msg, "Update available", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                            Process.Start(new ProcessStartInfo(htmlUrl) { UseShellExecute = true });
                     }
-                    catch { }
                 }
             }
-            catch { }
-        }
-
-        public static void ExtractSaveResource(String filename, String location)
-        {
-            try
+            catch (Exception ex)
             {
-                //  Assembly assembly = Assembly.GetExecutingAssembly();
-                Assembly a = Assembly.GetExecutingAssembly();
-                // Stream stream = assembly.GetManifestResourceStream("Installer.Properties.mydll.dll"); // or whatever 
-                string my_namespace = a.GetName().Name.ToString();
-                Stream resFilestream = a.GetManifestResourceStream(filename);
-                if (resFilestream != null)
-                {
-                    BinaryReader br = new BinaryReader(resFilestream);
-                    FileStream fs = new FileStream(location, FileMode.Create); // say 
-                    BinaryWriter bw = new BinaryWriter(fs);
-                    byte[] ba = new byte[resFilestream.Length];
-                    resFilestream.Read(ba, 0, ba.Length);
-                    bw.Write(ba);
-                    br.Close();
-                    bw.Close();
-                    resFilestream.Close();
-                }
-                // this.Close(); 
+                if (interactive)
+                    MessageBox.Show("Could not check for updates: " + ex.Message, "Update", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
-            catch { }
         }
 
-        private void btCheckUpdate_Click(object sender, RoutedEventArgs e)
+        internal static bool IsNewer(string latestTag, string currentFileVersion)
         {
-            try
-            {
-                //string sVersion = System.Reflection.Assembly.GetEntryAssembly().GetName().Version.ToString();
-                string sVersion = FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetEntryAssembly().Location).FileVersion; ;
-
-                RZUpdater oRZUpdate = new RZUpdater();
-                var oUpdate = oRZUpdate.CheckForUpdateAsync("Client Center for Configuration Manager", sVersion, "Zander Tools").Result;
-
-                try
-                {
-                    Properties.Settings.Default.LastUpdateCheck = DateTime.Now;
-                    Properties.Settings.Default.Save();
-
-                    if (IsUserAnAdmin())
-                    {
-
-                        if (oUpdate != null)
-                        {
-                            //Console.WriteLine("New Version: " + oUpdate.SW.ProductVersion);
-                            ExtractSaveResource("AgentActionTools.RZUpdate.exe", Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"));
-
-                            if (System.Windows.MessageBox.Show("Do you want to install Version: " + oUpdate.SW.ProductVersion, "Update available", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-                            {
-                                /*new Thread(() =>
-                                {
-                                    Thread.CurrentThread.IsBackground = true;
-                                    if (oUpdate.Download())
-                                    {
-                                        if (oUpdate.Install(true))
-                                        {
-                                        }
-                                        else
-                                        {
-                                            System.Windows.MessageBox.Show("Installation failed...");
-                                        }
-                                    }
-                                }).Start();*/
-
-                                Process.Start(new ProcessStartInfo(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location), "RZGet.exe"), "SCCMCliCtr") { UseShellExecute = true });
-                                Process.GetCurrentProcess().Kill();
-                            }
-
-                        }
-                        else
-                        {
-                            System.Windows.MessageBox.Show("No update available...", "Update", MessageBoxButton.OK, MessageBoxImage.Information);
-                        }
-                    }
-                    else
-                    {
-                        if (oUpdate != null)
-                        {
-                            System.Windows.MessageBox.Show("An newer Version is available: " + oUpdate.SW.ProductVersion + ". You have to start ClientCenter as Admin to install the update", "Update available", MessageBoxButton.OK, MessageBoxImage.Information);
-                        }
-                    }
-                }
-                catch { }
-
-                /*
-                //Start only if updater.exe is not yet running...
-                if (Process.GetProcessesByName("updater.exe").Count() == 0)
-                {
-                    Process.Start("updater.exe", "/checknow");
-                }*/
-            }
-            catch { }
+            Version latest;
+            Version current;
+            if (!TryParseVersion(latestTag, out latest) || !TryParseVersion(currentFileVersion, out current))
+                return false;
+            return Normalize(latest) > Normalize(current);
         }
 
-        [DllImport("shell32.dll")]
-        public static extern bool IsUserAnAdmin();
+        static bool TryParseVersion(string value, out Version version)
+        {
+            version = null;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            string s = value.Trim();
+            if (s.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+                s = s.Substring(1);
+            int cut = s.IndexOfAny(new[] { '-', '+' });
+            if (cut >= 0)
+                s = s.Substring(0, cut);
+            return Version.TryParse(s, out version);
+        }
 
+        static Version Normalize(Version v)
+        {
+            return new Version(v.Major, v.Minor, v.Build < 0 ? 0 : v.Build, v.Revision < 0 ? 0 : v.Revision);
+        }
     }
 }
